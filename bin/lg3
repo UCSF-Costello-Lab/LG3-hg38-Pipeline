@@ -1,0 +1,136 @@
+#! /usr/bin/env bash
+### LG3 Pipeline
+### 
+### Usage:
+###  lg3 <tool> ...
+###
+### Tools:
+### {{table_of_tools}}
+###
+### Examples:
+###  lg3 --help
+###  lg3 --version
+###  lg3 --news
+###  lg3 run Trim Patient157t10
+###  lg3 run --help
+###  lg3 status --help
+###  lg3 status --all Patient157t10
+###  lg3 cleanup --help
+###  lg3 test setup
+###  lg3 test validate Patient157t10
+###
+### Settings:
+###  LG3_HOME={{LG3_HOME}}
+###  EMAIL={{EMAIL}}
+###
+### Version: 2021-10-11
+### Source: https://github.com/UCSF-Costello-Lab/LG3_Pipeline
+
+LG3_DIR=$(dirname "$(readlink -e "$0")")
+export LG3_DIR
+export LG3_TOOLS=true
+
+## Always search the same directory first
+PATH="$LG3_DIR:$PATH"
+
+function mecho {
+    >&2 echo "$@"
+}
+
+function mcat {
+    >&2 cat "$@"
+}
+
+function list_tools {
+    tools=
+    for path in $(echo -e "${PATH//:/\\n}" | sort -u); do
+    # shellcheck disable=SC2010,SC2086
+    tools="$tools $(ls $path/lg3-* 2> /dev/null | grep -vE '(^#|~$|#$)' | sed 's|.*/lg3-||')"
+    done
+    echo -e "${tools// /\\n}" | sort -u | grep -vE "^$"
+}
+
+function whatis {
+    local pathname
+    pathname="$(command -v "lg3-$1")"
+    local res
+    res=$(grep -E "^### whatis: " "$pathname" | sed 's/^### whatis: //')
+    if [[ -z "${res}" ]]; then
+        res=$(grep -E "^### " "$pathname" | head -1 | sed 's/^### //')
+    fi
+    echo "$res"
+}
+
+function table_of_tools {
+    local cmd
+    for cmd in $(list_tools); do
+        printf " %-8s  %s\\n" "$cmd" "$(whatis "$cmd")"
+    done
+}
+
+version() {
+    local ver
+    ver=$(grep -E "^###[ ]*Version:[ ]*" "$0" | sed 's/###[ ]*Version:[ ]*//g')
+    ## Develop version?
+    if ! (( $(echo "$ver" | grep -q -E "[-]9[0-9][0-9][0-9]") )); then
+	if [ -d "${LG3_HOME}/.git" ] && ! (( $(command -v git &> /dev/null) )); then
+	    commit=$(cd "$LG3_HOME" || return; git rev-parse --short HEAD)
+            ver="$ver (commit ${commit})"
+	fi
+    fi
+    echo "$ver"
+}
+
+news() {
+    less "${LG3_HOME}/NEWS.md"
+}
+
+help() {
+    if [ $# -lt 1 ]; then
+      local t
+      t=$(table_of_tools)
+      t=${t//$'\n'/\\n}
+      grep "^###" "$0" | cut -b 5- | sed "s|{{LG3_HOME}}|$LG3_HOME|" | sed "s|{{LG3_OUTPUT_ROOT}}|$LG3_OUTPUT_ROOT|" | sed "s|{{EMAIL}}|$EMAIL|" | sed "s/{{table_of_tools}}/$t/"
+    else
+      local pathname
+      pathname="$(command -v "lg3-$1")"
+      local res
+      grep "^###" "$pathname" | cut -b 5-
+    fi
+}
+
+main() {
+    if [ $# -lt 1 ]; then
+        help
+        exit 1
+    elif [ "$1" == "--help" ]; then
+        help
+        exit 1
+    elif [ "$2" == "--help" ]; then
+        help "$1"
+        exit 1
+    elif [ "$1" == "--version" ]; then
+        version
+        exit 1
+    elif [ "$1" == "--news" ]; then
+        news
+        exit 1
+    elif [ "$1" == "--tools" ]; then
+        list_tools
+        exit 1
+    elif [ "$2" == "--whatis" ]; then
+        whatis "$1"
+        exit 1
+    fi
+    
+    SUBCOMMAND="$1"; shift
+    SUBCMD=$LG3_DIR/lg3-$SUBCOMMAND
+    if [ ! -e "$SUBCMD" ]; then
+        help
+        exit 1
+    fi
+
+    $SUBCMD "$@"
+}
+
+main "$@"

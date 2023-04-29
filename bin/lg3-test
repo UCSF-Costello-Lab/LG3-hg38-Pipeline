@@ -1,0 +1,560 @@
+#! /usr/bin/env bash
+### Run and Validate LG3 Pipeline Test Examples
+###
+### Usage:
+###  lg3 test <command> [options] <patient>
+###
+### Command:
+###   setup      Set up test in current folder
+###   validate   Validate output of tests
+###
+### Examples:
+###  lg3 test setup
+###  lg3 test validate Patient157t10
+###
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+LG3_TEST_TRUTH=${LG3_TEST_TRUTH:-/costellolab/data1/shared/LG3_Pipeline/example_data}
+PROJECT=${PROJECT:-LG3}
+CONV=${CONV:-patient_ID_conversions.tsv}
+
+## Enable extended globbing, e.g. for exluding
+## shopt -s extglob
+
+function mecho {
+    >&2 echo "$*"
+}
+
+function printf_red {
+    tput setaf 1 2> /dev/null ## red
+    # shellcheck disable=SC2059,SC2068
+    printf "${@}"
+    tput sgr0 2> /dev/null    ## reset
+}
+
+function printf_yellow {
+    tput setaf 3 2> /dev/null ## yellow
+    # shellcheck disable=SC2059,SC2068
+    printf "${@}"
+    tput sgr0 2> /dev/null    ## reset
+}
+
+function printf_green {
+    tput setaf 2 2> /dev/null ## green
+    # shellcheck disable=SC2059,SC2068
+    printf "${@}"
+    tput sgr0 2> /dev/null    ## reset
+}
+
+function error {
+    >&2 printf_red "ERROR: %s\\n" "$*"
+    exit 1
+}
+
+function title {
+    echo "*** $*"
+}
+
+function report_ok {
+    printf "["
+    printf_green "OK"
+    echo "] $*"
+}
+
+function report_note {
+    printf "["
+    printf_yellow "NOTE"
+    echo "] $*"
+}
+
+function report_warn {
+    printf "["
+    printf_yellow "WARN"
+    echo "] $*"
+}
+
+function report_error {
+    printf "["
+    printf_red "ERROR"
+    echo "] $*"
+}
+
+function report_skip {
+    printf "["
+    printf_yellow "SKIP"
+    echo "] $*"
+}
+
+function expected_file_tree {
+    local res;
+
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}"
+
+    local path="$1"
+    local truth_path=${path/${PROJECT}/LG3}
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}"
+    [[ -d "${path}" ]] || { report_skip "No such folder: ${path}"; return; }
+    shift
+
+    # Step not started?
+    { tree "${path}" | grep -qF " 0 files" ; } && { report_skip "No files found: ${path}"; return; }
+    
+    local glob=$1  ## optional
+    if [[ -n "${glob}" ]]; then
+        path="${path}/${glob}"
+        truth_path="${truth_path}/${glob}"
+    fi
+
+    # shellcheck disable=SC2164,SC2086
+    res=$(diff -U 0 <(cd "${LG3_TEST_TRUTH}/${PATIENT}"; tree -I '*.md5' ${truth_path} | sed "s|/LG3/|/${PROJECT}/|g") <(tree -I '*.md5' ${path}))
+        
+    if [ -z "${res}" ]; then
+        report_ok "file tree ('${path}')"
+    else
+        report_warn "unexpected file tree ('${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}' != '${path}')"
+        echo "${res}" | tail -n +3
+    fi
+}
+
+function expected_file_sizes {
+    local res;
+
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}"
+
+    local unit=$1
+    if [[ "${unit}" == "bytes" ]]; then
+        unit=-b
+    elif [[ "${unit}" == "human" ]]; then
+        unit=-h
+    fi
+    shift
+    
+    local path="$1"
+    local truth_path=${path/${PROJECT}/LG3}
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}"
+    [[ -d "${path}" ]] || { report_skip "No such folder: ${path}"; return; }
+    shift
+
+    # Step not started?
+    { tree "${path}" | grep -qF " 0 files"; } && { report_skip "No files found: ${path}"; return; }
+    
+    local glob=$1  ## optional
+    if [[ -n "${glob}" ]]; then
+        path="${path}/${glob}"
+        truth_path="${truth_path}/${glob}"
+    fi
+
+    # shellcheck disable=SC2164,SC2086
+    res=$(diff -U 0 <(cd "${LG3_TEST_TRUTH}/${PATIENT}"; du --apparent-size --si ${unit} ${truth_path} | grep -vF '.md5' | sed "s|/LG3/|/${PROJECT}/|g") <(du --apparent-size --si ${unit} ${path} | grep -vF '.md5'))
+        
+    if [ -z "${res}" ]; then
+        report_ok "file sizes ('${path}')"
+    else
+        report_warn "unexpected file sizes ('${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}' != '${path}')"
+        echo "${res}" | tail -n +3
+    fi
+}
+
+function expected_file_rows {
+    local res;
+
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}"
+
+    local path="$1"
+    local truth_path=${path/${PROJECT}/LG3}
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}"
+    [[ -d "${path}" ]] || { report_skip "No such folder: ${path}"; return; }
+    shift
+
+    local glob=$1  ## optional
+    if [[ -n "${glob}" ]]; then
+        path="${path}/${glob}"
+        truth_path="${truth_path}/${glob}"
+    fi
+    
+    # shellcheck disable=SC2164,SC2086
+    res=$(diff -U 0 <(cd "${LG3_TEST_TRUTH}/${PATIENT}"; wc -l ${truth_path} | sed "s|/LG3/|/${PROJECT}/|g") <(wc -l ${path}))
+        
+    if [ -z "${res}" ]; then
+        report_ok "file rows ('${path}')"
+    else
+        report_warn "unexpected file rows ('${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}' != '${path}')"
+        echo "${res}" | tail -n +3
+    fi
+}
+
+
+function expected_file_content {
+    local res;
+
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}"
+
+    local pathname="$1"
+    local truth_pathname=${pathname/${PROJECT}/LG3}
+    [[ -f "${LG3_TEST_TRUTH}/${PATIENT}/${truth_pathname}" ]] || error "No such file: ${LG3_TEST_TRUTH}/${PATIENT}/${truth_pathname}"
+    [[ -f "${pathname}" ]] || { report_skip "No such file: ${pathname}"; return; }
+    shift
+
+    local cols="$1"
+    if [ -z "${cols}" ]; then
+        res=$(diff -U 0 "${LG3_TEST_TRUTH}/${PATIENT}/${truth_pathname}" "${pathname}")
+    else
+        res=$(diff -U 0 <(cut -d $'\t' -f "1-$cols" "${LG3_TEST_TRUTH}/${PATIENT}/${truth_pathname}") <(cut -d $'\t' -f "1-$cols" "${pathname}"))
+    fi
+    if [ -z "${res}" ]; then
+        report_ok "file content ('${pathname}')"
+    else
+        report_warn "unexpected file content ('${pathname}')"
+        echo "${res}"
+    fi
+}
+
+## Example: expected_file_md5 "${path}" 'Z00*-trim/*.fastq.gz'
+## Example: expected_file_md5 "${path}" 'Z00*-trim/*.fastq.gz' gunzip
+function expected_file_md5 {
+    local res
+    local res_array
+    local t
+    local cat_cmd
+    
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}"
+
+    local path="$1"
+    local truth_path=${path/${PROJECT}/LG3}
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}"
+    [[ -d "${path}" ]] || { report_skip "No such folder: ${path}"; return; }
+    shift
+
+    # Step not started?
+    { tree "${path}" | grep -qF " 0 files"; } && { report_skip "No files found: ${path}"; return; }
+    
+    local glob=$1
+    shift
+    [[ -n "${glob}" ]] || error 'No *.gz files specified'
+
+    local how="$1"
+    shift
+    cat_cmd="cat"
+    if [[ "$how" == "gunzip" ]]; then
+      cat_cmd="zcat"
+    fi
+
+    t="${LG3_TEST_TRUTH}/${PATIENT}"
+    res_array=()
+    for pp in ${path}/${glob}; do
+	[[ $pp == *.md5 ]] && continue
+	dir=$(dirname "$pp")
+	ff=$(basename "$pp")
+	mm=${ff}
+        if [[ "$how" == "gunzip" ]]; then
+	    mm=${ff/.gz/}
+	fi    
+	mm="${mm}.md5"
+	[[ -f "${dir}/${mm}" ]] || "$cat_cmd" "${dir}/${ff}" | md5sum > "${dir}/${mm}"
+	[[ -f "${t}/${dir}/${mm}" ]] || "$cat_cmd" "${t}/${dir}/${ff}" | md5sum > "${t}/${dir}/${mm}"
+	res_array+=("$(diff -b "${t}/${dir}/${mm}" "${dir}/${mm}")")
+    done
+
+    ## String array as string
+    res=${res_array[*]}
+    
+    ## Trim whitespace
+    res=${res##*( )}
+
+    t=""
+    if [[ -n "$how" ]]; then
+	t=" (after $how)"
+    fi 
+    if [ -z "${res}" ]; then
+        report_ok "file md5 checksums$t ('${path}/${glob}')"
+    else
+        report_warn "unexpected file md5 checksums$t ('${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}/${glob}' != '${path}/${glob}')"
+    fi
+}
+
+function expected_file_bam {
+    local res
+    local res_array
+    local files_array
+    local t
+    local cat_cmd
+    
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}"
+
+    local path="$1"
+    local truth_path=${path/${PROJECT}/LG3}
+    [[ -d "${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}" ]] || error "No such folder: ${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}"
+    [[ -d "${path}" ]] || { report_skip "No such folder: ${path}"; return; }
+    shift
+
+    # Step not started?
+    { tree "${path}" | grep -qF " 0 files"; } && { report_skip "No files found: ${path}"; return; }
+    
+    local glob=$1
+    shift
+    [[ -n "${glob}" ]] || error 'No *.gz files specified'
+
+    t="${LG3_TEST_TRUTH}/${PATIENT}"
+    res_array=()
+    # shellcheck disable=SC2206
+    files_array=(${path}/${glob})
+    for ii in "${!files_array[@]}"; do
+	pp=${files_array[$ii]}
+	dir=$(dirname "$pp")
+	ff=$(basename "$pp")
+	printf "(%d/%d) bam diff: %s ... " "$((ii + 1))" "${#files_array[@]}" "${ff}"
+	bam diff --noPhoneHome --in1 "${t}/${dir}/${ff}" --in2 "${dir}/${ff}" > bam_diff
+	printf '\r                                                              \r'
+	[[ -s bam_diff ]] && res_array+=("$ff")
+        rm bam_diff
+    done
+
+    ## String array as string
+    res=${res_array[*]}
+    
+    ## Trim whitespace
+    res=${res##*( )}
+
+    t=""
+    if [[ -n "$how" ]]; then
+	t=" (after $how)"
+    fi 
+    if [ -z "${res}" ]; then
+        report_ok "BAM file content ('${path}/${glob}')"
+    else
+        report_warn "unexpected BAM file content ('${LG3_TEST_TRUTH}/${PATIENT}/${truth_path}/${glob}' != '${path}/${glob}')"
+    fi
+}
+
+function time_range_of_files {
+    ## At this point, file timestamps is *not* a sufficient estimate on how
+    ## long each step took at, because they don't reflect when each step *started*.
+    ## For that, we need to add an initial file when the step starts.
+    ## Skipping for now. /HB 2018-10-01
+    return
+    files=$(find "$*" -type f -exec stat --format '%Y :%y %n' "{}" \; | sort -n | cut -d ' ' -f 2-3 | sed -E 's/(^:|[.].*)//g')
+    first=$(echo "${files}" | head -1)
+    last=$(echo "${files}" | tail -1)
+    echo "     Time range of files: ${first} -- ${last}"
+}
+
+function prune_timestamps() {
+    sed -E 's/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]/YYYY-MM-DD hh:mm:ss/g' | sed -E 's/[0-9][0-9]:[0-9][0-9]:[0-9][0-9],[0-9][0-9][0-9]/hh:mm:ss,uuu/g' | sed -E 's/[A-Z][a-z]+ [A-Z][a-z]+ [0-9]+ [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [A-Z][A-Z][A-Z] [0-9][0-9][0-9][0-9]/DDD MMMM DD hh:mm:ss TZ YYYY/g'
+}
+
+function prune_folders() {
+    sed -E 's/LG3_Pipeline-[0-9-]+/LG3_Pipeline/g' | sed -E 's/[0-9]+.cclc01.som.ucsf.edu/NNN.cclc01.som.ucsf.edu/g'
+}
+
+function prune_gatk() {
+    sed -E '/^(real|user|sys)/d' | sed -E '/^WARN  ..:..:..,... RestStorageService - Error Response/d'
+}
+
+
+#### Parse optional args
+full=false
+
+while [ -n "$1" ]; do
+    case $1 in
+        --full) full=true; shift;;
+        setup) action="$1"; shift;;
+        validate) action="$1"; shift;;
+        --*) error "Unknown option $1";;
+        *)  break;;
+    esac
+done
+
+PATIENT=${PATIENT:-$1}
+
+if [ "$action" == "setup" ]; then
+    title "Setup"
+    if [[ -z "${LG3_HOME}" ]]; then
+        report_error "LG3_HOME: <not set>"
+    elif [[ -d "${LG3_HOME}" ]]; then
+        report_ok "LG3_HOME: ${LG3_HOME}"
+    else
+        report_error "LG3_HOME: ${LG3_HOME} (non-existing folder)"
+    fi
+
+    ## Now we can load all the utils functions
+    # shellcheck source=scripts/utils.sh
+    source "${LG3_HOME}/scripts/utils.sh"
+
+    report_ok "Current directory: ${PWD}"
+    
+    if [ -f "lg3.conf" ] && ! equal_dirs "." "${LG3_HOME}"; then
+        report_note "Local configuration detected: ./lg3.conf ($(stat --printf='%s' lg3.conf) bytes)"
+    fi
+
+    if "${RSCRIPT}" -e 'quit(status = require("RColorBrewer"))' &> /dev/null; then
+	## Create R user library folder
+        "R_LIBS_USER=~/R/%p-library/%v ${RSCRIPT}" -e "dir.create(Sys.getenv('R_LIBS_USER'), recursive = TRUE)"
+	## Install missing package
+	"${RSCRIPT}" -e 'install.packages("RColorBrewer", repos = "http://cloud.r-project.org")'
+    fi
+    if "${RSCRIPT}" -e 'quit(status = require("RColorBrewer"))' &> /dev/null; then
+        report_error "R packages: 'RColorBrewer' (failed to install)"
+    else
+        report_ok "R packages: 'RColorBrewer'"
+    fi
+
+    if [[ -n "${EMAIL}" ]]; then
+        report_ok "EMAIL: ${EMAIL}"
+    else
+        report_error "EMAIL: <not set>"
+    fi
+
+    report_ok "PROJECT: ${PROJECT:?}"
+
+    if [[ "${PATIENT}" == *[_]* ]]; then
+        report_error "PATIENT: ${PATIENT} (must not contain underscores)"
+    else
+        report_ok "PATIENT: ${PATIENT} (required for 'lg3 test validate')"
+    fi    
+
+    [[ -n "${CONV}" ]] || report_error "CONV (patient TSV file): <not set>"
+    
+    target=${LG3_HOME}/runs_demo/${CONV}
+    [[ -r "${target}" ]] || report_error "CONV (patient TSV file): No such template file ${target}"
+    
+    ln -fs "${target}" .
+    if [[ -f "${CONV}" ]]; then
+        report_ok "CONV (patient TSV file): ${CONV}"
+    else
+        report_error "CONV (patient TSV file): ${CONV} (failed to link to '${target}')}"
+    fi
+    
+    if [[ -n "${PATIENT}" ]]; then
+	grep -qw "${PATIENT}" "${CONV}" || report_error "CONV: No entry with 'patient_ID' of value '${PATIENT}'"
+    fi
+    SAMPLES=${SAMPLES:-$(grep -w "${PATIENT}" "${CONV}" | cut -f 1 | tr '\n' ' ')}
+    report_ok "  => SAMPLES: ${SAMPLES} (required by 'Recal' step)"
+    NORMAL=${NORMAL:-$(grep -w "${PATIENT}" "${CONV}" | grep -w "Normal" | cut -f 1)}
+    report_ok "  => NORMAL: '${NORMAL}' (required by 'Recal' step)"
+    dir=rawdata
+    target=${LG3_TEST_TRUTH}/${dir}
+    ln -fs "${target}" .
+    if [ -d "${dir}" ]; then
+        report_ok "Raw data folder: ${dir}"
+    else
+        report_error "Raw data folder: ${dir} (failed to link to '${target}')"
+    fi
+    if [[ -z "${LG3_OUTPUT_ROOT}" ]]; then
+        report_error "LG3_OUTPUT_ROOT: <not set>"
+    elif [[ -d "${LG3_OUTPUT_ROOT}" ]]; then
+        report_ok "LG3_OUTPUT_ROOT: ${LG3_OUTPUT_ROOT}"
+    else
+        report_error "LG3_OUTPUT_ROOT: ${LG3_OUTPUT_ROOT} (non-existing folder)"
+    fi
+    echo
+elif [ "$action" == "validate" ]; then
+    title "Configuration"
+    report_ok "PROJECT=${PROJECT:?}"
+    report_ok "PATIENT=${PATIENT:?}"
+    report_ok "CONV=${CONV:?}"
+    report_ok "LG3_TEST_TRUTH=${LG3_TEST_TRUTH:?}"
+    [[ -f "${CONV}" ]] || { echo "File not found: ${CONV}"; exit 1; }
+    echo
+    
+    title "Trimming of FASTQ Files"
+    path=output/${PROJECT}/trim
+    ## Backward compatibility
+    if [ ! -d "${path}" ]; then path=output; fi
+    if [ -d "${path}" ]; then
+        expected_file_tree "${path}" 'Z00*-trim'
+        expected_file_sizes bytes "${path}" 'Z00*-trim/*'
+        expected_file_md5 "${path}" 'Z00*-trim/*.fastq.gz' gunzip
+	time_range_of_files "${path}"
+    else
+        report_skip "No such folder: ${path}"
+    fi
+    echo
+    title "BWA Alignment of FASTQ Files"
+    path=output/${PROJECT}/exomes
+    if [ -d "${path}" ]; then
+        expected_file_tree "${path}"
+        expected_file_sizes human "${path}" "Z00*/*"
+        expected_file_md5 "${path}" 'Z00*/*.bai'
+        expected_file_md5 "${path}" 'Z00*/*.bam'
+        expected_file_md5 "${path}" 'Z00*/*.flagstat'
+        time_range_of_files "${path}"
+    else
+        report_skip "No such folder: ${path}"
+    fi
+    echo
+
+    title "Recalibration of BAM Files"
+    path=output/${PROJECT}/exomes_recal/${PATIENT}
+    if [ -d "${path}" ]; then
+        expected_file_tree "${path}"
+        expected_file_sizes human "${path}" "*"
+        expected_file_sizes human "${path}" "germline/*"
+        expected_file_md5 "${path}" 'germline/*.germline'
+        expected_file_sizes human "${path}" "*.bai"
+        expected_file_md5 "${path}" '*.flagstat'
+        expected_file_md5 "${path}" '*.bai'
+        expected_file_md5 "${path}" '*.bam'
+        $full && expected_file_bam "${path}" '*.bam'
+        time_range_of_files "${path}"
+    else
+        report_skip "No such folder: ${path}"
+    fi
+    echo
+    
+    title "Pindel Processing"
+    path=output/${PROJECT}/pindel
+    if [ -d "${path}" ]; then
+        expected_file_tree "${path}"
+        expected_file_rows "${path}" "${PATIENT}.pindel.cfg"
+        expected_file_sizes human "${path}/${PATIENT}_pindel" "*"
+        expected_file_md5 "${path}" "${PATIENT}_pindel/*"
+        time_range_of_files "${path}"
+    else
+        report_skip "No such folder: ${path}"
+    fi
+    echo
+    
+    title "MutDet Processing"
+    path=output/${PROJECT}/mutations/${PATIENT}_mutect
+    if [ -d "${path}" ]; then
+        expected_file_tree "${path}"
+        expected_file_sizes human "${path}" "*"
+        expected_file_md5 "${path}" "*.mutations"
+        expected_file_md5 "${path}" "*.txt"
+        expected_file_md5 "${path}" "*.intersect.bed"
+        time_range_of_files "${path}"
+    else
+        report_skip "No such folder: ${path}"
+    fi
+    echo
+
+    title "Post-MutDet Processing"
+    path=output/${PROJECT}/MAF
+    if [ -d "${path}" ]; then
+        expected_file_tree "${path}"
+        expected_file_sizes human "${path}" "${PATIENT}_MAF/*"
+        expected_file_sizes human "${path}" "${PATIENT}_plots/*"
+        time_range_of_files "${path}"
+    else
+        report_skip "No such folder: ${path}"
+    fi
+
+    path=output/${PROJECT}/MutInDel
+    if [ -d "${path}" ]; then
+        expected_file_tree "${path}"
+        expected_file_sizes human "${path}" "*"
+        res=$(expected_file_content "${path}/${PATIENT}.R.mutations")
+	echo "${res}"
+	if [[ ${res} == *WARN* ]]; then
+            expected_file_content "${path}/${PATIENT}.R.mutations" 10
+	fi
+        time_range_of_files "${path}"
+    else
+        report_skip "No such folder: ${path}"
+    fi
+    echo
+fi

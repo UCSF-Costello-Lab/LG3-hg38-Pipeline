@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+assert_pwd
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+LG3_INPUT_ROOT=${LG3_INPUT_ROOT:-rawdata}
+PROJECT=${PROJECT:-LG3}
+PATIENT=${PATIENT:-Patient157t10}
+CONV=${CONV:-patient_ID_conversions.tsv}
+CONV=$(readlink -e "$CONV")
+SAMPLES=${SAMPLES:-$(grep -P "\\t${PATIENT}\\t" "${CONV}" | cut -f1 | tr '\n' ' ')}
+EMAIL=${EMAIL:?}
+
+## Requires absolute path 
+LG3_HOME=$(readlink -e "$LG3_HOME")
+LG3_OUTPUT_ROOT=$(readlink -e "$LG3_OUTPUT_ROOT")
+
+echo "Input:"
+echo "- LG3_HOME=${LG3_HOME:?}"
+echo "- PROJECT=${PROJECT:?}"
+echo "- PATIENT=${PATIENT:?}"
+echo "- CONV=${CONV:?}"
+echo "- SAMPLES=${SAMPLES:?}"
+echo "- LG3_INPUT_ROOT=${LG3_INPUT_ROOT:?}"
+echo "- LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:?}"
+echo "- EMAIL=${EMAIL}"
+echo "- TG=${TG}"             ## optional
+
+assert_patient_name "${PATIENT}"
+
+QSUB_ENVVARS="LG3_HOME=${LG3_HOME},LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT},EMAIL=${EMAIL}"
+QSUB_ENVVARS=$(lg3_qsub_envvar_append_software)
+if $qsub_can_set_pwd; then
+  QSUB_OPTS="${QSUB_OPTS} -d ${PWD:?}";
+fi
+
+## Override the qsub email address?
+if [[ -n ${EMAIL} ]]; then
+  QSUB_OPTS="${QSUB_OPTS} -M ${EMAIL}"
+fi
+
+echo "Qsub extras:"
+echo "- QSUB_OPTS=${QSUB_OPTS}"
+echo "- QSUB_ENVVARS=${QSUB_ENVVARS}"
+
+PBS=${LG3_HOME}/trim_galore.pbs
+assert_file_exists "${PBS}"
+
+echo "ETA ~4h"
+
+QTY=20
+
+for SAMPLE in ${SAMPLES}; do
+    ## Use file globbing to allow for optional suffixes after _R1 and _R2.
+    ## FIXME: shopt -s nullglob  ## Return empty array if no matches are found
+    FASTQ1s=("${LG3_INPUT_ROOT}/${SAMPLE}_R1"*.fastq.gz)
+    FASTQ2s=("${LG3_INPUT_ROOT}/${SAMPLE}_R2"*.fastq.gz)
+
+    ## Assert that at most single files were found by globbing
+    [[ ${#FASTQ1s[@]} -eq 1 ]] || error "Expected one file: [${#FASTQ1s[@]}] ${FASTQ1s[*]}"
+    [[ ${#FASTQ2s[@]} -eq 1 ]] || error "Expected one file: [${#FASTQ2s[@]}] ${FASTQ2s[*]}"
+
+    ## Requires absolute path 
+    FASTQ1=$(readlink -e "${FASTQ1s[0]}")
+    FASTQ2=$(readlink -e "${FASTQ2s[0]}")
+   
+    [[ -r "${FASTQ1}" ]] || error "Can't open $SAMPLE from ${LG3_INPUT_ROOT}/: ${FASTQ1}"
+    [[ -r "${FASTQ2}" ]] || error "Can't open $SAMPLE from ${LG3_INPUT_ROOT}/: ${FASTQ2}"
+
+    echo "Submitting $SAMPLE: quality $QTY ..."
+    echo "- FASTQ1: ${FASTQ1}"
+    echo "- FASTQ2: ${FASTQ2}"
+    
+    # shellcheck disable=SC2086
+    qsub ${QSUB_OPTS} -N tr$SAMPLE -v "${QSUB_ENVVARS},FASTQ1=${FASTQ1},FASTQ2=${FASTQ2},SAMPLE=${SAMPLE},QTY=${QTY},PROJECT=${PROJECT}" "$PBS"
+done
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

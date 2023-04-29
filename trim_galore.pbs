@@ -1,0 +1,104 @@
+#!/bin/bash
+#PBS -e _Trim_${SAMPLE}.err
+#PBS -o _Trim_${SAMPLE}.out
+#PBS -l nodes=1:ppn=1,vmem=4gb
+#PBS -l walltime=14-00:00:00
+#PBS -l mem=4gb
+#PBS -m ae
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+### Configuration
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
+LG3_DEBUG=${LG3_DEBUG:-true}
+
+### Input
+echo "Input:"
+echo "- FASTQ1=${FASTQ1:?}"
+echo "- FASTQ2=${FASTQ2:?}"
+echo "- PROJECT=${PROJECT:?}"
+echo "- SAMPLE=${SAMPLE:?}"
+echo "- QTY=${QTY:?}"
+echo "- TG=${TG}"
+
+## Assert existance of input files
+assert_file_exists "${FASTQ1}"
+assert_file_exists "${FASTQ2}"
+
+### Debug
+if [ $LG3_DEBUG = true ]; then
+  echo "Settings:"
+  echo "- LG3_HOME=$LG3_HOME"
+  echo "- LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
+  echo "- EMAIL=${EMAIL}"
+  echo "- LG3_SCRATCH_ROOT=$LG3_SCRATCH_ROOT"
+  echo "- PWD=$PWD"
+  echo "- USER=$USER"
+  echo "- hostname=$(hostname)"
+fi
+
+## Requires absolute paths
+FASTQ1=$(readlink -e "${FASTQ1:?}")
+FASTQ2=$(readlink -e "${FASTQ2:?}")
+echo "FASTQ1=${FASTQ1:?} (expanded)"
+echo "FASTQ2=${FASTQ2:?} (expanded)"
+
+OPWD=${PWD:?}
+PROG=trim_galore
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
+echo "Started $PROG on $DATE"
+
+## Assert existance of software
+SH_TRIM_GALORE=${LG3_HOME}/scripts/trim_galore.sh
+assert_file_executable "${SH_TRIM_GALORE}"
+
+make_dir "${LG3_OUTPUT_ROOT}"
+make_dir "${LG3_OUTPUT_ROOT}/${PROJECT}"
+make_dir "${LG3_OUTPUT_ROOT}/${PROJECT}/trim"
+
+WDIR=${LG3_SCRATCH_ROOT}/${SAMPLE}-trim
+echo "WDIR=${WDIR}"
+make_dir "${WDIR}"
+change_dir "${WDIR}"
+echo "Current working directory: ${PWD}"
+
+cp "$FASTQ1" .
+cp "$FASTQ2" .
+
+"${SH_TRIM_GALORE}" -quality="$QTY" "$FASTQ1" "$FASTQ2" "$SAMPLE" || error "trim_galore FAILED"
+
+FQ1=$(basename "$FASTQ1")
+FQ2=$(basename "$FASTQ2")
+rm "$FQ1" "$FQ2"
+
+echo "Intermediate output files:"
+ls -laR
+
+echo "Renaming and moving files of interest to final destination:"
+[[ "$QTY" -eq 20 ]] && SAMPLE_PREFIX=${SAMPLE}-trim || SAMPLE_PREFIX=${SAMPLE}-trim${QTY}
+echo "- SAMPLE_PREFIX=${SAMPLE_PREFIX}"
+
+mv "${SAMPLE}_R1"*_val_1.fq.gz "${SAMPLE_PREFIX}_R1.fastq.gz" || error "Failed to copy ${SAMPLE_PREFIX}_R1.fastq.gz"
+mv "${SAMPLE}_R2"*_val_2.fq.gz "${SAMPLE_PREFIX}_R2.fastq.gz" || error "Failed to copy ${SAMPLE_PREFIX}_R2.fastq.gz"
+mv "${SAMPLE}_R1"*.fastq.gz_trimming_report.txt "${SAMPLE_PREFIX}_R1.trimming_report.txt" || error "Failed to copy ${SAMPLE_PREFIX}_R2.trimming_report.txt"
+mv "${SAMPLE}_R2"*.fastq.gz_trimming_report.txt "${SAMPLE_PREFIX}_R2.trimming_report.txt" || error "Failed to copy ${SAMPLE_PREFIX}_R2.trimming_report.txt"
+
+change_dir "${OPWD}"
+echo "Current working directory: ${PWD}"
+
+cp -r -p "${WDIR}" "${LG3_OUTPUT_ROOT}/${PROJECT}/trim"
+
+echo "Output: ${LG3_OUTPUT_ROOT}/${PROJECT}/trim/${SAMPLE}-trim"
+ls -s "${LG3_OUTPUT_ROOT}/${PROJECT}/trim/${SAMPLE}-trim"
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

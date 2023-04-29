@@ -1,0 +1,102 @@
+#! /usr/bin/env bash
+### Run an LG3 Pipeline Step
+###
+### Usage:
+###  lg3 run [options] <step> <patient> <patient2> ...
+###
+### Options:
+###  --dryrun   Do everything but launching the run script
+###  --list     List all available LG3 run steps
+###
+### Steps:
+###  Trim       
+###  Align_gz   
+###  Recal      
+###  Pindel     
+###  MutDet     
+###  PostMut    
+###  ...
+###
+### Examples:
+###  lg3 run Trim
+###  lg3 run Align_gz
+###  lg3 run Recal
+###  lg3 run Pindel && lg3 run MutDet
+###  lg3 run PostMut
+###
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+
+wcl() {
+    grep -vc "^#" "$1" 
+}
+
+lg3_list_run_steps() {
+    change_dir "${LG3_HOME}/runs_demo" > /dev/null; find . -type f -name "_run_*" | sed 's/.*_run_//' | sort
+}
+
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+PROJECT=${PROJECT:-LG3}
+
+list=false
+dryrun=false
+step=
+PATIENT=
+
+## Parse optional args
+while [ -n "$1" ]; do
+    case $1 in
+        --dryrun)
+	    dryrun=true
+	    ;;
+        --list)
+	    list=true
+	    ;;
+        --*)
+   	    echo "error: no such option $1";
+	    exit 1
+	    ;;
+         *)
+	    if [[ -z "${step}" ]]; then
+                step=$1
+	    elif [[ -z "${PATIENT}" ]]; then
+	        PATIENT=${PATIENT} $1
+            else
+	        error "Unknown argument (too many?): $1"
+            fi
+	    ;;
+    esac
+    shift
+done
+
+if $list; then
+    echo "Available lg3 run <step>s:"
+    mapfile -t scripts < <(lg3_list_run_steps)
+    printf " - %s\n" "${scripts[@]}"
+    exit 0;
+fi
+
+## Validate 'step'
+step_script=${LG3_HOME}/runs_demo/_run_${step}
+[[ -f "${step_script}" ]] || error "Unknown lg3 run step: '${step}' (not one of: $(lg3_list_run_steps | tr '\n' ' ' | sed -E 's/[[:space:]]$//' | sed 's/ /, /g'))"
+assert_file_executable "${step_script}"
+
+source_lg3_conf
+
+PATIENT=${PATIENT:-Patient157t10}
+
+echo "Launching the LG3 pipeline:"
+echo "- Step   : ${step:?}"
+echo "- Project: ${PROJECT}"
+echo "- Patient: ${PATIENT:?}"
+
+[[ -n "${EMAIL}" ]] || error "Environment variable 'EMAIL' not set"
+
+## Nothing more to do?
+if $dryrun; then
+    echo "Dryrun enables. Skipping ${step_script}"
+    exit 0;
+fi
+
+source "${step_script}"

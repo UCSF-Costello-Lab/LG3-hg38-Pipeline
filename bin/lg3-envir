@@ -1,0 +1,23 @@
+#! /usr/bin/env bash
+### Display LG3 Pipeline Environment Variables
+###
+### Usage:
+###  lg3 envir
+###
+CURDIR=$(pwd -P)
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+echo "Cur dir =$CURDIR"
+echo "LG3_HOME=$LG3_HOME"
+echo "LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
+echo "LG3_INPUT_ROOT=$LG3_INPUT_ROOT"
+echo "PROJECT=$PROJECT"
+echo "CONV=$CONV"
+echo "PATIENT=$PATIENT"
+echo "SAMPLES=$SAMPLES"
+
+[[ "${PATIENT}" == *[_]* ]] && { echo "ERROR: 'PATIENT' must not contain underscores: ${PATIENT}"; exit 1; }
+

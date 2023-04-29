@@ -1,0 +1,17 @@
+export LG3_HOME=/c4/home/jocostello/repos/LG3-hg38-Pipeline
+export PATH="${LG3_HOME}/bin:${PATH}"
+export CONV=patient_ID_conversions_test.tsv
+export PATIENT=Patient157t10
+
+export PROJECT=LG3_hg38
+export SAMPLE=
+export SAMPLES=
+
+echo "Initial environment"
+echo "LG3_HOME = $LG3_HOME"
+echo "CONV = $CONV"
+echo "PATIENT = $PATIENT"
+echo "PROJECT = $PROJECT"
+echo "SAMPLE = $SAMPLE"
+echo "SAMPLES = $SAMPLES"
+
