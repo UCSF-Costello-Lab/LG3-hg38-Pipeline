@@ -1,0 +1,94 @@
+#!/bin/bash
+### Usage: qsub -N Job_Name -v FASTQ1=/path/to/read1.fastq,FASTQ2=/path/to/read2.fastq,SAMPLE=Output_Prefix_ID_Number /path/to/Align_fastq.pbs
+### Output files
+#PBS -e _Align_${SAMPLE}.err
+#PBS -o _Align_${SAMPLE}.out
+#PBS -l nodes=1:ppn=16,vmem=128gb
+#PBS -l walltime=14-00:00:00
+#PBS -l mem=128gb
+#PBS -m ae
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+### Configuration
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+PROJECT=${PROJECT:-LG3}
+EMAIL=${EMAIL:?}
+LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
+LG3_DEBUG=${LG3_DEBUG:-true}
+
+### Debug
+if [ $LG3_DEBUG = true ]; then
+  echo "Settings:"
+  echo "- LG3_HOME=$LG3_HOME"
+  echo "- LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
+  echo "- EMAIL=${EMAIL}"
+  echo "- LG3_SCRATCH_ROOT=$LG3_SCRATCH_ROOT"
+  echo "- PWD=$PWD"
+  echo "- USER=$USER"
+  echo "- SLURM_NTASKS=$SLURM_NTASKS"
+  echo "- hostname=$(hostname)"
+fi
+
+### Input
+echo "Input:"
+echo "- FASTQ1=${FASTQ1:?}"
+echo "- FASTQ2=${FASTQ2:?}"
+echo "- SAMPLE=${SAMPLE:?}"
+echo "- PATIENT=${PATIENT:?}"
+echo "- PROJECT=${PROJECT:?}"
+
+## Assert existance of input files
+assert_file_exists "${FASTQ1}"
+assert_file_exists "${FASTQ2}"
+
+FASTQ1=$(readlink -e "${FASTQ1}") ## Absolute path
+FASTQ2=$(readlink -e "${FASTQ2}") ## Absolute path
+
+OPWD=${PWD:?}
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
+echo "Started $PROG on $DATE as $USER"
+
+## Assert existance of software
+SH_ALIGN_FASTQ=${LG3_HOME}/scripts/Align_mem.sh
+assert_file_executable "${SH_ALIGN_FASTQ}"
+
+DEST="${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}"
+make_dir "${DEST}"
+
+WDIR=${LG3_SCRATCH_ROOT}/${SAMPLE}
+make_dir "${WDIR}"
+change_dir "${WDIR}"
+echo "Current working directory: ${PWD}"
+
+cp "$FASTQ1" "$FASTQ2" .
+
+#echo "Content of ${PWD}:"
+#ls -srt
+
+FQ1=$(basename "$FASTQ1")
+FQ2=$(basename "$FASTQ2")
+
+"${SH_ALIGN_FASTQ}" "$FQ1" "$FQ2" "$SAMPLE" || error "${SH_ALIGN_FASTQ} FAILED"
+
+rm "$FQ1" "$FQ2"
+
+change_dir "${OPWD}"
+echo "Current working directory: ${PWD}"
+
+echo "Content of ${WDIR}:"
+ls -srt "${WDIR}"
+
+echo "Copying results to permanent location..."
+cp -p "${WDIR}/"* "${DEST}/"
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+clean-logs
+
+assert_pwd
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+#LG3_INPUT_ROOT=${LG3_INPUT_ROOT:-rawdata}
+LG3_INPUT_ROOT=${LG3_INPUT_ROOT:-${LG3_OUTPUT_ROOT}}
+PROJECT=${PROJECT:-LG3_hg38}
+PATIENT=${PATIENT:-Patient157t10}
+CONV=${CONV:-patient_ID_conversions.tsv}
+EMAIL=${EMAIL:?}
+
+## Requires absolute path 
+LG3_HOME=$(readlink -e "$LG3_HOME")
+LG3_OUTPUT_ROOT=$(readlink -e "$LG3_OUTPUT_ROOT")
+
+echo "Input:"
+echo "- LG3_HOME=${LG3_HOME:?}"
+echo "- LG3_INPUT_ROOT=${LG3_INPUT_ROOT:?}"
+#echo "- LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:?}"
+echo "- EMAIL=${EMAIL}"
+echo "- PROJECT=${PROJECT:?}"
+echo "- PATIENT=${PATIENT:?}"
+echo "- CONV=${CONV:?}"
+
+assert_patient_name "${PATIENT}"
+
+SAMPLES=${SAMPLES:-$(grep -P "\\t${PATIENT}\\t" "${CONV}" | cut -f1 | tr '\n' ' ')}
+echo "- SAMPLES=${SAMPLES:?}"
+
+QSUB_ENVVARS="LG3_HOME=${LG3_HOME},LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT},EMAIL=${EMAIL}"
+QSUB_ENVVARS=$(lg3_qsub_envvar_append_software)
+if $qsub_can_set_pwd; then
+  QSUB_OPTS="${QSUB_OPTS} -d ${PWD:?}";
+fi
+
+## Override the qsub email address?
+if [[ -n ${EMAIL} ]]; then
+  QSUB_OPTS="${QSUB_OPTS} -M ${EMAIL}"
+fi
+
+echo "Qsub extras:"
+echo "- QSUB_OPTS=${QSUB_OPTS}"
+echo "- QSUB_ENVVARS=${QSUB_ENVVARS}"
+
+PBS=${LG3_HOME}/Align_mem.pbs
+assert_file_exists "${PBS}"
+
+
+for SAMPLE in ${SAMPLES}
+do
+  #FASTQ1=${LG3_INPUT_ROOT}/${SAMPLE}_R1.fastq.gz
+  #FASTQ2=${LG3_INPUT_ROOT}/${SAMPLE}_R2.fastq.gz
+  FASTQ1=${LG3_INPUT_ROOT}/${PROJECT}/trim/${SAMPLE}-trim/${SAMPLE}-trim_R1.fastq.gz
+  FASTQ2=${LG3_INPUT_ROOT}/${PROJECT}/trim/${SAMPLE}-trim/${SAMPLE}-trim_R2.fastq.gz
+
+  ## Requires absolute path 
+  FASTQ1=$(readlink -e "$FASTQ1")
+  FASTQ2=$(readlink -e "$FASTQ2")
+  assert_file_exists "$FASTQ1"
+  assert_file_exists "$FASTQ2"
+  
+  ## Expected Location of prepared BAMs
+  #ALIGNED=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}
+  echo "Submitting $SAMPLE ..."
+  # shellcheck disable=SC2086
+  qsub ${QSUB_OPTS} -N Al${SAMPLE} -v "${QSUB_ENVVARS},FASTQ1=${FASTQ1},FASTQ2=${FASTQ2},SAMPLE=${SAMPLE},PATIENT=${PATIENT},PROJECT=${PROJECT}" "${PBS}"
+done
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

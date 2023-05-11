@@ -1,0 +1,159 @@
+#!/bin/bash
+
+#PBS -e _fac_${PATIENT}.err
+#PBS -o _fac_${PATIENT}.out
+#PBS -l nodes=1:ppn=12,vmem=32gb
+#PBS -l walltime=10-00:00:00
+#PBS -l mem=32gb
+#PBS -m ae
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+### Configuration
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+EMAIL=${EMAIL:?}
+PROJECT=${PROJECT:-LG3}
+CONV=${CONV:-patient_ID_conversions.tsv}
+LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT}/facets/${PATIENT:?}
+LG3_DEBUG=${LG3_DEBUG:-true}
+ncores=${SLURM_NTASKS:-1}
+
+### Debug
+if $LG3_DEBUG ; then
+  echo "Debug info:"
+  echo "- LG3_HOME=${LG3_HOME:?}"
+  echo "- LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
+  echo "- EMAIL=${EMAIL}"
+  echo "- LG3_SCRATCH_ROOT=$LG3_SCRATCH_ROOT"
+  echo "- PWD=$PWD"
+  echo "- USER=$USER"
+  echo "- hostname=$(hostname)"
+  echo "- node(s): ${SLURM_JOB_NODELIST}"
+  echo "- ncores=$ncores"
+fi
+
+LG3_OUTPUT_ROOT=$(readlink -e "${LG3_OUTPUT_ROOT}") ## Absolute path
+assert_directory_exists "${LG3_OUTPUT_ROOT}"
+
+### Input
+echo "Input:"
+echo "- PATIENT=${PATIENT:?}"
+echo "- PROJECT=${PROJECT:?}"
+echo "- CONV=${CONV:?}"
+
+assert_patient_name "${PATIENT}"
+assert_file_exists "${CONV}"
+CONV=$(readlink -e "${CONV}") ## Absolute path
+
+module load CBI r/3.6.0
+python --version
+${RSCRIPT} --version
+
+SNP_PILEUP_SETUP=${LG3_HOME}/scripts/create_input_snp_pileup.py
+assert_file_exists "${SNP_PILEUP_SETUP}"
+FACETS_RUN=${LG3_HOME}/scripts/runFACETS.R
+assert_file_exists "${FACETS_RUN}"
+
+echo "Software:"
+echo "- SNP_PILEUP_SETUP=${SNP_PILEUP_SETUP:?}"
+echo "- SNP_PILEUP=${SNP_PILEUP:?}"
+assert_file_executable "${SNP_PILEUP}"
+echo "- COMMONSNPS=${COMMONSNPS:?}"
+assert_file_exists "${COMMONSNPS:?}"
+echo "- FACETS_RUN=${FACETS_RUN:?}"
+
+## set up scratch directory
+make_dir "${LG3_SCRATCH_ROOT}"
+change_dir "${LG3_SCRATCH_ROOT}"
+
+BAMPATH=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem
+
+echo "Pre-filter ${CONV} file"
+head -n 1 "${CONV}" > "${CONV}.${PATIENT}"
+grep -w "${PATIENT}" "${CONV}" >> "${CONV}.${PATIENT}" 
+wc -l "${CONV}.${PATIENT}"
+
+echo -e "\\n========= Create config file for ${SNP_PILEUP_SETUP}"
+python "${SNP_PILEUP_SETUP}" "${CONV}.${PATIENT}" "${BAMPATH}" || error "${SNP_PILEUP_SETUP} failed"
+rm "${CONV}.${PATIENT}"
+
+CNF=${PATIENT}.snp_pileup_input.txt
+grep -w "${PATIENT}" snp_pileup_input.txt > "${CNF}"
+rm snp_pileup_input.txt
+assert_file_exists "${CNF}"
+echo "========= Final config file:"
+cat "${CNF}"
+
+echo -e "============== Run ${SNP_PILEUP} "
+# PART 1: creates input arrays from a samples file (snp_pileup_input.txt) that we will loop through - only things in this file will be run through the pipeline
+
+#patientARRAY=($(cut -f 1 "${CNF}"))
+#normalidARRAY=($(cut -f 2 "${CNF}"))
+#tumoridARRAY=($(cut -f 3 "${CNF}"))
+#normalbamARRAY=($(cut -f 4 "${CNF}"))
+#tumorbamARRAY=($(cut -f 5 "${CNF}"))
+#sampleARRAY=($(cut -f 6 "${CNF}"))
+
+## Better to use:
+patientARRAY=()
+while IFS='' read -r line; do patientARRAY+=("$line"); done < <(cut -f 1 "${CNF}")
+normalidARRAY=()
+while IFS='' read -r line; do normalidARRAY+=("$line"); done < <(cut -f 2 "${CNF}")
+tumoridARRAY=()
+while IFS='' read -r line; do tumoridARRAY+=("$line"); done < <(cut -f 3 "${CNF}")
+normalbamARRAY=()
+while IFS='' read -r line; do normalbamARRAY+=("$line"); done < <(cut -f 4 "${CNF}")
+tumorbamARRAY=()
+while IFS='' read -r line; do tumorbamARRAY+=("$line"); done < <(cut -f 5 "${CNF}")
+sampleARRAY=()
+while IFS='' read -r line; do sampleARRAY+=("$line"); done < <(cut -f 6 "${CNF}")
+
+rm "${CNF}"
+
+echo "Found ${#patientARRAY[*]} sample(s)"
+echo "P0 --${sampleARRAY[0]}--"
+echo "P1 --${sampleARRAY[1]}--"
+
+
+# PART 2: Loops through arrays above and runs snp-pileup, a piece of c++ code that prepares FACETS input from bam files
+for ((i=0; i<${#patientARRAY[*]}; i++));
+do
+    make_dir "${patientARRAY[i]}"
+    ${SNP_PILEUP} -g -q15 -Q20 -P100 -r25,0 -d1000 \
+			"${COMMONSNPS}" \
+			"${patientARRAY[i]}"/"${patientARRAY[i]}"_"${sampleARRAY[i]}"_"${normalidARRAY[i]}"_vs_"${tumoridARRAY[i]}" \
+			"${normalbamARRAY[i]}" \
+			"${tumorbamARRAY[i]}"
+done
+
+# PART 3: Runs FACETS by patient, and creates a final output summary file, FACETS.txt, for each patient, which includes the purity for each sample
+#patientARRAY=(Patient469 Patient486) # can use this to override PART 1 if ever just want to rerun facets post-PART2 (comment both parts out) for specific patients
+patientuniqARRAY=("$(echo "${patientARRAY[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' ')")
+for patient in "${patientuniqARRAY[@]}"
+do
+    ## Trim spaces 
+	 patient=$(echo "${patient}" | xargs echo -n)
+    echo "======== Running FACETS for ${patient}===="
+    Rscript "${FACETS_RUN}" "${patient}"/
+done
+
+## set up output directory
+WDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/facets
+make_dir "${WDIR}"
+
+
+## move from scratch to project folder
+cp -rp "${LG3_SCRATCH_ROOT}"/* "${WDIR}"
+
+echo "Output is in ${WDIR}"
+ls -l "${WDIR}"
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

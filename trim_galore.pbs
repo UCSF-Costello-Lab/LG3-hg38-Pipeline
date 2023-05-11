@@ -1,9 +1,9 @@
 #!/bin/bash
 #PBS -e _Trim_${SAMPLE}.err
 #PBS -o _Trim_${SAMPLE}.out
-#PBS -l nodes=1:ppn=1,vmem=4gb
+#PBS -l nodes=1:ppn=1,vmem=8gb
 #PBS -l walltime=14-00:00:00
-#PBS -l mem=4gb
+#PBS -l mem=8gb
 #PBS -m ae
 
 # shellcheck source=scripts/utils.sh

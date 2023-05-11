@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+assert_pwd
+clean-logs
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+LG3_INPUT_ROOT=${LG3_INPUT_ROOT:-${LG3_OUTPUT_ROOT}}
+EMAIL=${EMAIL:?}
+PATIENT=${PATIENT:-Patient157t10}
+PROJECT=${PROJECT:-LG3}
+CONV=${CONV:-patient_ID_conversions.tsv}
+
+## Requires absolute path 
+LG3_HOME=$(readlink -e "$LG3_HOME")
+LG3_OUTPUT_ROOT=$(readlink -e "$LG3_OUTPUT_ROOT")
+
+echo "Input:"
+echo "- LG3_HOME=${LG3_HOME:?}"
+echo "- LG3_INPUT_ROOT=${LG3_INPUT_ROOT:?}"
+echo "- LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:?}"
+echo "- EMAIL=${EMAIL}"
+echo "- PATIENT=${PATIENT:?}"
+echo "- PROJECT=${PROJECT:?}"
+echo "- CONV=${CONV:?}"
+
+assert_patient_name "${PATIENT}"
+
+assert_file_exists "${CONV}"
+CONV=$(readlink -e "$CONV")
+
+SH_MUTECT2_SUBMIT=${LG3_HOME}/scripts/mutect2_submit.sh
+assert_file_executable "${SH_MUTECT2_SUBMIT}"
+
+echo -n "Submitting jobs for $PATIENT "
+date
+
+## Assert that input files exist
+D=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}
+assert_directory_exists "${D}"
+
+## Pass QSUB_OPTS to ${SH_MUTECT2_SUBMIT} where it's an optional input
+export QSUB_OPTS
+
+"${SH_MUTECT2_SUBMIT}" "${PATIENT}" "${CONV}" "${PROJECT}" || error "${SH_MUTECT2_SUBMIT} failed"
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

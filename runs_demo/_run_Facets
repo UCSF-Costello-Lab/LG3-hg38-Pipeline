@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+assert_pwd
+clean-logs
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+PROJECT=${PROJECT:-LG3}
+CONV=${CONV:-patient_ID_conversions.tsv}
+PATIENT=${PATIENT:-Patient157t10}
+EMAIL=${EMAIL:?}
+
+## Requires absolute path 
+LG3_HOME=$(readlink -e "$LG3_HOME")
+LG3_OUTPUT_ROOT=$(readlink -e "$LG3_OUTPUT_ROOT")
+
+echo "Input:"
+echo "- LG3_HOME=${LG3_HOME:?}"
+echo "- LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:?}"
+echo "- EMAIL=${EMAIL}"
+echo "- PATIENT=${PATIENT:?}"
+echo "- PROJECT=${PROJECT:?}"
+echo "- CONV=${CONV:?}"
+
+assert_patient_name "${PATIENT}"
+
+assert_file_exists "${CONV}"
+CONV=$(readlink -e "$CONV")
+
+
+QSUB_ENVVARS="LG3_HOME=${LG3_HOME},LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT},EMAIL=${EMAIL}"
+QSUB_ENVVARS=$(lg3_qsub_envvar_append_software)
+if $qsub_can_set_pwd; then
+  QSUB_OPTS="${QSUB_OPTS} -d ${PWD:?}";
+fi
+
+## Override the qsub email address?
+if [[ -n ${EMAIL} ]]; then
+  QSUB_OPTS="${QSUB_OPTS} -M ${EMAIL}"
+fi
+
+echo "Qsub extras:"
+echo "- QSUB_OPTS=${QSUB_OPTS}"
+echo "- QSUB_ENVVARS=${QSUB_ENVVARS}"
+
+PBS=${LG3_HOME}/facets.pbs
+assert_file_exists "${PBS}"
+
+## Assert that input directory exist
+D=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}
+assert_directory_exists "${D}"
+
+## Short PatientID
+PAT=${PATIENT/atient/}
+# shellcheck disable=SC2086
+qsub ${QSUB_OPTS} -N "Fac${PAT}" -v "${QSUB_ENVVARS},PATIENT=${PATIENT},PROJECT=${PROJECT},CONV=${CONV}" "$PBS"
+
+#sbatch --mail-user="${EMAIL}" --mail-type=END,FAIL \
+   #--job-name="fac_${PAT}" \
+   #--output="fac_${PAT}.out" \
+   #--error="fac_${PAT}.err" \
+   #--export=ALL,LG3_HOME="${LG3_HOME}",LG3_OUTPUT_ROOT="${LG3_OUTPUT_ROOT}",PROJECT="${PROJECT}",PATIENT="${PATIENT}",CONV="${CONV}",LG3_DEBUG="${LG3_DEBUG}" \
+   #--nodes=1 \
+   #--ntasks=6 \
+   #--mem=20G \
+   #--time=9-06:00:00 \
+   #"${PBS}"
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

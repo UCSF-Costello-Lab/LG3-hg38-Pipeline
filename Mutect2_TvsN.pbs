@@ -1,0 +1,113 @@
+#!/bin/bash
+
+### Usage: qsub -v NORMAL=LibraryName,TUMOR=LibraryName,TYPE=TUM_or_REC1,PATIENT=XX,CONFIG=/path/to/mutationconfig.cfg,ILIST=/path/to/Interval_List ${LG3_HOME}/MutDet.pbs
+### Use Config: ${LG3_HOME}/FilterMutations/mutationConfig.cfg
+### Use Interval: ${LG3_HOME}/resources/All_exome_targets.extended_200bp.interval_list 
+### Output files
+#PBS -e _M2_${TUMOR}.err
+#PBS -o _M2_${TUMOR}.out
+#PBS -N M2
+#PBS -l nodes=1:ppn=1,vmem=256g
+#PBS -l walltime=14-00:00:00
+#PBS -l mem=256gb
+#PBS -m ae
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+### Configuration
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+LG3_INPUT_ROOT=${LG3_INPUT_ROOT:-${LG3_OUTPUT_ROOT}}
+PROJECT=${PROJECT:?}
+EMAIL=${EMAIL:?}
+LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
+LG3_DEBUG=${LG3_DEBUG:-true}
+
+### Debug
+if $LG3_DEBUG ; then
+  echo "Settings:"
+  echo "- LG3_HOME=$LG3_HOME"
+  echo "- LG3_INPUT_ROOT=$LG3_INPUT_ROOT"
+  echo "- LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
+  echo "- EMAIL=${EMAIL}"
+  echo "- PROJECT=${PROJECT}"
+  echo "- LG3_SCRATCH_ROOT=$LG3_SCRATCH_ROOT"
+  echo "- PWD=$PWD"
+  echo "- USER=$USER"
+  echo "- SLURM_NTASKS=$SLURM_NTASKS"
+  echo "- hostname=$(hostname)"
+fi
+
+assert_directory_exists "${LG3_INPUT_ROOT}"
+LG3_INPUT_ROOT=$(readlink -e "${LG3_INPUT_ROOT:?}") ## Absolute path
+
+### Input
+echo "Input:"
+echo "- PATIENT=${PATIENT:?}"
+echo "- TUMOR=${TUMOR:?}"
+echo "- NORMAL=${NORMAL:?}"
+echo "- TYPE=${TYPE:?}"
+echo "- RECAL_BAM_EXT=${RECAL_BAM_EXT:?}"
+#echo "- CONFIG=${CONFIG:?}"
+echo "- ILIST=${ILIST:?}"
+echo "- XMX=${XMX:?}"
+echo "- WORKDIR=${WORKDIR:?}"
+assert_patient_name "${PATIENT}"
+BAMDIR=${LG3_INPUT_ROOT}/${PROJECT}/bwa-mem
+assert_directory_exists "${BAMDIR}"
+#assert_file_exists "${CONFIG}"
+assert_file_exists "${ILIST}"
+#CONFIG=$(readlink -e "${CONFIG:?}") ## Absolute path
+ILIST=$(readlink -e "${ILIST:?}") ## Absolute path
+
+### Software
+SH_MUTECT2=${LG3_HOME}/scripts/Mutect2_TvsN.sh
+assert_file_executable "${SH_MUTECT2}"
+
+BAMN=$BAMDIR/${PATIENT}/${NORMAL}.${RECAL_BAM_EXT}.bam
+BAMT=$BAMDIR/${PATIENT}/${TUMOR}.${RECAL_BAM_EXT}.bam
+
+assert_file_exists "${BAMN}"
+assert_file_exists "${BAMT}"
+
+SCRATCH="${LG3_SCRATCH_ROOT}/${PATIENT}_mutect2"
+make_dir "${SCRATCH}"
+change_dir "${SCRATCH}"
+
+echo -n "Starting Mutect2 job on "
+date
+echo "Patient = $PATIENT"
+echo "Normal = $BAMN"
+echo "Tumor = $BAMT"
+echo "Tum. Type = $TYPE"
+#echo "Config = $CONFIG"
+echo "Interval = $ILIST"
+echo "Java Memory = $XMX"
+echo "WORKDIR=$WORKDIR"
+echo "SCRATCH=${SCRATCH}"
+
+{ time "${SH_MUTECT2}" \
+  "$BAMN" \
+  "$BAMT" \
+  "NOR-${NORMAL}__${TYPE}-${TUMOR}" \
+  "${PATIENT}" \
+  "${ILIST}" \
+  "${XMX}" \
+  "${WORKDIR}"; } 2>&1 || error "Mutect2 failed"
+
+make_dir "${WORKDIR}"
+echo "Copy results from ${SCRATCH} to ${WORKDIR}"
+cp -p "${SCRATCH}"/* "${WORKDIR}" || error "Fail to copy results to ${WORKDIR}"
+
+echo "End of PBS script!"
+date
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"
