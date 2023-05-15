@@ -11,25 +11,15 @@
 ###
 ###  --trim                Remove trimmed FASTQ files
 ###  --align               aligned BAM files
-###  --recal               recalibrated BAM files
-###  --recal2              recalibrated Pass 2 BAM files 
 ###  --mut                 MutDet files
-###  --pindel              Pindel files
-###  --comb                combo output
-###  --maf                 MAF files
-###  --qc1                 QC1 files
-###  --qc2                 QC2 files
-###  --qc3                 QC3 files
-###  --qc                  All QC files
 ###  --fac                 All FACETS files
-###  --avf                 Delete AVF file
 ###  --all                 everything
 ###
 ###  --hot                 Delete the files (otherwise only a dry run)
 ###
 ### Examples:
 ###  lg3 cleanup --patient=Patient157t10 --samples="Z00599t10 Z00600t10 Z00601t10"
-###  lg3 cleanup --patient=Patient157t10 --recal --hot
+###  lg3 cleanup --patient=Patient157t10 --trim --hot
 ###
 PROGRAM=${BASH_SOURCE[0]}
 PROG=$(basename "$PROGRAM")
@@ -41,18 +31,8 @@ source_lg3_conf
 HOT=false
 TRIM=false
 ALIGN=false
-RECAL=false
-RECAL2=false
 MUT=false
-PINDEL=false
-COMB=false
-MAF=false
-QC=false
-QC1=false
-QC2=false
-QC3=false
 FAC=false
-AVF=false
 ALL=false
 
 CONV=${CONV:-patient_ID_conversions.tsv}
@@ -69,18 +49,8 @@ help() {
     echo -e "\\twhere options indicate what data to delete"
     echo -e "\\t\\t--trim"
     echo -e "\\t\\t--align"
-    echo -e "\\t\\t--recal"
-    echo -e "\\t\\t--recal2"
     echo -e "\\t\\t--mut"
-    echo -e "\\t\\t--pindel"
-    echo -e "\\t\\t--comb"
-    echo -e "\\t\\t--maf"
-    echo -e "\\t\\t--qc1"
-    echo -e "\\t\\t--qc2"
-    echo -e "\\t\\t--qc3"
-    echo -e "\\t\\t--qc"
     echo -e "\\t\\t--fac"
-    echo -e "\\t\\t--awf"
     echo -e "\\t\\t--all\\tRemove all"
     exit 1
 }
@@ -97,18 +67,8 @@ case $1 in
     --hot) HOT=true;shift 1;;
     --trim) TRIM=true;shift 1;;
     --align) ALIGN=true;shift 1;;
-    --recal) RECAL=true;shift 1;;
-    --recal2) RECAL2=true;shift 1;;
     --mut) MUT=true;shift 1;;
-    --pindel) PINDEL=true;shift 1;;
-    --comb) COMB=true;shift 1;;
-    --maf) MAF=true;shift 1;;
-    --qc) QC=true;shift 1;;
-    --qc1) QC1=true;shift 1;;
-    --qc2) QC2=true;shift 1;;
-    --qc3) QC3=true;shift 1;;
     --fac) FAC=true;shift 1;;
-    --avf) AVF=true;shift 1;;
     --all) ALL=true;shift 1;;
     -*) echo "error: no such option $1";exit 1;;
     *)  break;;
@@ -117,15 +77,8 @@ done
 if $ALL ; then
     TRIM=true
     ALIGN=true
-    RECAL=true
-    #RECAL2=true
     MUT=true
-    PINDEL=true
-    COMB=true
-    MAF=true
-    QC=true
     FAC=true
-    AVF=true
 fi
 
 SAMPLES=${SAMPLES:-$(grep -w "${PATIENT}" "${CONV}" | cut -f1 | tr '\n' ' ')}
@@ -137,14 +90,9 @@ echo "Samples = ${SAMPLES:?}"
 
 LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
 TRIMDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/trim
-ALIGNDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/exomes
-RECALDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/exomes_recal
+ALIGNDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem
 MUTDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/mutations
-PINDELDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/pindel
-COMBDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/MutInDel
-MAFDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/MAF
 FACDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/facets
-QCDATA=${LG3_OUTPUT_ROOT}/${PROJECT}/exome_QC_plots
 
 if ! ${HOT} ; then
     echo "WARNING: Dry run! Use --hot to actually delete data"    
@@ -174,94 +122,9 @@ if ${ALIGN} ; then
    done
 fi
 
-if ${RECAL} ; then
-    echo "========== Removing recal data for ${PATIENT:?} ..."
-    D="${RECALDATA}/${PATIENT}"
-    du -h "${D}" || { echo "STOP"; exit 1; }
-    echo -e "\\trm -rf ${D}"
-    ${HOT} && rm -rf "${D}"
-fi
-
-if ${RECAL2} ; then
-    echo "========== Removing recal before.merge data for ${PATIENT:?} ..."
-    D="${RECALDATA}/${PATIENT}.before.merge"
-    du -h "${D}" || { echo "STOP"; exit 1; }
-    echo -e "\\trm -rf ${D}"
-    ${HOT} && rm -rf "${D}"
-fi
-
 if ${MUT} ; then
     echo "========== Removing mutect data for ${PATIENT:?} ..."
-    D="${MUTDATA}/${PATIENT}_mutect"
-    du -h "${D}" || { echo "STOP"; exit 1; }
-    echo -e "\\trm -rf ${D}"
-    ${HOT} && rm -rf "${D}"
-fi
-
-if ${PINDEL} ; then
-    echo "========== Removing pindel data for ${PATIENT:?} ..."
-    D="${PINDELDATA}/${PATIENT}_pindel"
-    du -h "${D}" || { echo "STOP"; exit 1; }
-    echo -e "\\trm -rf ${D}"
-    ${HOT} && rm -rf "${D}"
-    echo -e "\\trm -f ${PINDELDATA}/${PATIENT}.pindel.cfg"
-    ${HOT} && rm -rf "${D}"
-fi
-
-if ${COMB} ; then
-    echo "========== Removing combined data for ${PATIENT} ..."
-    echo -e "\\trm -f ${COMBDATA}/${PATIENT}.[sR]*"
-    du -hc "${COMBDATA}/${PATIENT}."[sR]*
-    ${HOT} && rm -f "${COMBDATA}/${PATIENT}."[sR]*
-fi
-
-if ${QC} ; then
-    echo "========== Removing QC data for ${PATIENT} ..."
-    echo -e "\\trm -f ${QCDATA}/${PATIENT}/*"
-    du -hc "${QCDATA}/${PATIENT}"
-    ${HOT} && rm -rf "${QCDATA:?}/${PATIENT}/"*
-fi
-
-if ${QC1} ; then
-    echo "========== Removing QC1 data for ${PATIENT} ..."
-    echo -e "\\trm -f ${QCDATA}/${PATIENT}/*"
-    du -hc "${QCDATA}/${PATIENT}"
-	 if ${HOT} ; then
-		 rm -f "${QCDATA}/${PATIENT}/_QC1_${PATIENT}".*
-		 rm -f "${QCDATA}/${PATIENT}/${PATIENT}".qualityinfo.tmp
-		 rm -f "${QCDATA}/${PATIENT}/${PATIENT}".snvs.anno.txt
-	 fi
-fi
-
-if ${QC2} ; then
-    echo "========== Removing QC2 data for ${PATIENT} ..."
-    echo -e "\\trm -f ${QCDATA}/${PATIENT}/*.bam.hist"
-    du -hc "${QCDATA}/${PATIENT}"/*.bam.hist
-	 if ${HOT} ; then
-		 rm -f "${QCDATA}/${PATIENT}/_QC2_${PATIENT}".*
-		 rm -f "${QCDATA}/${PATIENT}"/*.bam.hist
-	 fi
-fi
-
-if ${QC3} ; then
-    echo "========== Removing QC3 data for ${PATIENT} ..."
-    echo -e "\\trm -fr ${QCDATA}/${PATIENT}/${PATIENT}_qualplots"
-    du -hc "${QCDATA}/${PATIENT}/${PATIENT}_qualplots"
-	 if ${HOT} ; then
-		 rm -f "${QCDATA}/${PATIENT}/_QC3_${PATIENT}".*
-		 rm -fr "${QCDATA}/${PATIENT}/${PATIENT}_qualplots"
-	 fi
-fi
-
-if ${MAF} ; then
-    echo "========== Removing MAF data for ${PATIENT:?} ..."
-
-    D="${MAFDATA}/${PATIENT}_MAF"
-    du -h "${D}" || { echo "STOP"; exit 1; }
-    echo -e "\\trm -rf ${D}"
-    ${HOT} && rm -rf "${D}"
-
-    D="${MAFDATA}/${PATIENT}_plots"
+    D="${MUTDATA}/${PATIENT}_mutect2"
     du -h "${D}" || { echo "STOP"; exit 1; }
     echo -e "\\trm -rf ${D}"
     ${HOT} && rm -rf "${D}"
@@ -277,14 +140,6 @@ if ${FAC} ; then
        rm -f "${FACDATA}/${PATIENT}"/*.pdf
        rm -f "${FACDATA}/${PATIENT}"/FACETS.txt
     fi
-fi
-
-if ${AVF} ; then
-    echo "========== Removing AVF file for ${PATIENT} ..."
-	 OUT="${COMBDATA}/${PATIENT}.R.mutations.avf"
-	 echo -ne "\\t"
-	 wc -l "${OUT}"
-    ${HOT} && rm -f "${OUT}"
 fi
 
 echo "Finished!"

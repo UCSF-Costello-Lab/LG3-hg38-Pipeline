@@ -7,6 +7,7 @@
 #PBS -l walltime=14-00:00:00
 #PBS -l mem=128gb
 #PBS -m ae
+#PBS -l gres=scratch:1000gb
 
 # shellcheck source=scripts/utils.sh
 source "${LG3_HOME:?}/scripts/utils.sh"
@@ -88,7 +89,7 @@ echo "Current working directory: ${PWD}"
 echo "Content of ${WDIR}:"
 ls -srt "${WDIR}"
 
-echo "Copying results to permanent location..."
+echo "Copying results to permanent location : ${DEST}"
 cp -p "${WDIR}/"* "${DEST}/"
 
 echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

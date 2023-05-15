@@ -10,18 +10,9 @@
 ###  --fq              Check raw FASTQ files
 ###  --trim            Check trimmed FASTQ files
 ###  --bwa             Check aligned BAM files
-###  --recal           Check recalibrated output
-###  --recal2          Check before merge recalibrated output
 ###  --germline        Check germline output
-###  --mutect          Check MutDet output
-###  --pindel          Check Pindel output
-###  --combined        Check mutation output
-###  --avf             Check AVF filtered output
+###  --mutect2         Check Mutect output
 ###  --all             Check all outputs (default)
-###  --qc1             Check QC1 outputs
-###  --qc2             Check QC2 outputs
-###  --qc3             Check QC3 outputs
-###  --qc              Check all QC outputs
 ###  --fac             Check FACETS outputs
 ###
 ### Examples:
@@ -52,17 +43,8 @@ ALL=true
 FQ=false
 TRIM=false
 BWA=false
-REC=false
-REC2=false
 GL=false
-PINDEL=false
 MUT=false
-COMB=false
-AVF=false
-QC1=false
-QC2=false
-QC3=false
-QC=false
 FAC=false
 
 wcl() {
@@ -79,17 +61,8 @@ case $1 in
     --fq) FQ=true;ALL=false;shift 1;;
     --trim) TRIM=true;ALL=false;shift 1;;
     --bwa) BWA=true;ALL=false;shift 1;;
-    --recal) REC=true;ALL=false;shift 1;;
-    --recal2) REC2=true;ALL=false;shift 1;;
     --g*) GL=true;ALL=false;shift 1;;
-    --p*) PINDEL=true;ALL=false;shift 1;;
     --mut*) MUT=true;ALL=false;shift 1;;
-    --comb*) COMB=true;ALL=false;shift 1;;
-    --avf) AVF=true;ALL=false;shift 1;;
-    --qc1) QC1=true;ALL=false;shift 1;;
-    --qc2) QC2=true;ALL=false;shift 1;;
-    --qc3) QC3=true;ALL=false;shift 1;;
-	 --qc) QC=true;ALL=false;shift 1;;
     --fac) FAC=true;ALL=false;shift 1;;
     --*) echo "error: no such option $1";exit 1;;
     *)  break;;
@@ -100,20 +73,10 @@ if $ALL ; then
     FQ=true
     TRIM=true
     BWA=true
-    REC=true
-    #REC2=true
     GL=true
-    PINDEL=true
     MUT=true
-    COMB=true
 	 AVF=true
 	 FAC=true
-fi
-
-if $QC ; then
-   QC1=true
-   QC2=true
-   QC3=true
 fi
 
 PATIENTS=${*:-Patient157t10}
@@ -174,12 +137,12 @@ if $TRIM ; then
 fi
 
 if $BWA ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/exomes
+    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem
     ## Cycle through samples and check BWA
     while IFS=$'\t' read -r ID _ _ SAMP
     do
         ### Expected output
-        OUT=${WORKDIR}/${ID}/${ID}.trim.bwa.sorted.flagstat
+        OUT=${WORKDIR}/${PATIENT}/${ID}_final.bam.flagstat
         if [ -s "$OUT" ]; then
             echo -e "BWA $ID $OK"
         else
@@ -188,44 +151,14 @@ if $BWA ; then
     done < "${PATIENT}.temp.conversions.txt"
 fi
 
-if $REC ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/exomes_recal/${PATIENT}
-    ## Cycle through samples and check Recal output
-    while IFS=$'\t' read -r ID _ _ SAMP
-    do
-        ### Expected output
-        OUT=${WORKDIR}/${ID}.$BAM_SUFF
-        if [ -s "$OUT" ]; then
-            echo -e "Recal $ID $OK"
-        else
-            echo -e "Recal $ID $ERR"
-        fi
-    done < "${PATIENT}.temp.conversions.txt"
-fi
-
-if $REC2 ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/exomes_recal/${PATIENT}.before.merge
-    ## Cycle through samples and check Recal output
-    while IFS=$'\t' read -r ID _ _ SAMP
-    do
-        ### Expected output
-        OUT=${WORKDIR}/${ID}.$BAM_SUFF
-        if [ -s "$OUT" ]; then
-            echo -e "Recal $ID $OK"
-        else
-            echo -e "Recal $ID $ERR"
-        fi
-    done < "${PATIENT}.temp.conversions.txt"
-fi
-
 if $GL ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/exomes_recal/${PATIENT}/germline
-    OUT=${WORKDIR}/${PATIENT}.UG.snps.vcf
+    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}/germline
+    OUT=${WORKDIR}/${PATIENT}.filtered.snps.vcf
     if [ -s "$OUT" ]; then
         LCNT=$(wcl "$OUT")
-        echo -e "UG $OK ${YEL}${LCNT}${NOC}"
+        echo -e "Germline $OK ${YEL}${LCNT}${NOC}"
     else
-        echo -e "UG $ERR"
+        echo -e "Germline $ERR"
     fi
 
     ## Cycle through tumors and check Germline output
@@ -244,20 +177,8 @@ if $GL ; then
     done < "${PATIENT}.temp.conversions.txt"
 fi
 
-if $PINDEL ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/pindel/${PATIENT}_pindel
-    ## Expected output:
-    OUT=${WORKDIR}/${PATIENT}.indels.filtered.anno.txt
-    if [ -s "$OUT" ]; then
-        LCNT=$(wcl "$OUT")
-        echo -e "Pindel $OK ${YEL}${LCNT}${NOC}"
-    else
-        echo -e "Pindel $ERR"
-    fi
-fi
-
 if $MUT ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/mutations/${PATIENT}_mutect
+    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/mutations/${PATIENT}_mutect2
     ## Cycle through tumors and check MUTECT output
     while IFS=$'\t' read -r ID _ _ SAMP
     do
@@ -284,142 +205,15 @@ if $MUT ; then
         fi
     
         ## Expected output:
-        OUT=${WORKDIR}/${PATIENT}.NOR-${normid}__${samp_label}-${ID}.annotated.mutations
+        OUT=${WORKDIR}/NOR-${normid}__${samp_label}-${ID}.variants.funcotated.tsv
         if [ -s "$OUT" ]; then
             LCNT=$(wcl "$OUT")
-            echo -e "Mutect $ID $OK ${YEL}${LCNT}${NOC}"
+            echo -e "Mutect2 $ID $OK ${YEL}${LCNT}${NOC}"
         else
-            echo -e "Mutect $ID $ERR"
+            echo -e "Mutect2 $ID $ERR"
         fi
     
     done < "${PATIENT}.temp.conversions.txt"
-fi
-
-
-if $COMB ; then
-    WORKDIR1=${LG3_OUTPUT_ROOT}/${PROJECT}/MutInDel
-    ## Expected output: 
-    OUT=${WORKDIR1}/${PATIENT}.R.mutations
-    if [ -s "$OUT" ]; then
-        LCNT=$(wcl "$OUT")
-        echo -e "MutCombine $OK ${YEL}${LCNT}${NOC}"
-    else
-        echo -e "MutCombine $ERR"
-    fi
-    
-    WORKDIR2=${LG3_OUTPUT_ROOT}/${PROJECT}/MAF
-    OUT=${WORKDIR2}/${PATIENT}_MAF/${PATIENT}.Normal.MAF.txt    
-    if [ -s "$OUT" ]; then
-        echo -e "MAF $OK"
-    else
-        echo -e "MAF $ERR"
-    fi
-    
-    WORKDIR3=${LG3_OUTPUT_ROOT}/${PROJECT}/MAF
-    res=false
-    for ff in "${WORKDIR3}/${PATIENT}_plots/${PATIENT}".LOH*.pdf; do
-        if [ -s "$ff" ]; then
-            res=true
-        else
-            res=false
-        break
-        fi
-    done
-    if $res; then
-        echo -e "LOH plots $OK"
-    else
-        echo -e "LOH plots $ERR"
-    fi
-fi
-
-if $AVF ; then
-    WORKDIR1=${LG3_OUTPUT_ROOT}/${PROJECT}/MutInDel
-    ## Expected output: 
-    OUT=${WORKDIR1}/${PATIENT}.R.mutations.avf
-    if [ -s "$OUT" ]; then
-		  LCNT=$(grep -v retain -c "$OUT")
-        echo -e "AVF $OK ${YEL}${LCNT}${NOC}"
-    else
-        echo -e "AVF $ERR"
-    fi
-fi    
-
-
-
-
-if $QC1 ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/exome_QC_plots/${PATIENT}
-    ## Expected output:
-    #OUT=${WORKDIR}/${PATIENT}.qualityinfo.tmp
-    OUT=${WORKDIR}/${PATIENT}.snvs.anno.txt
-    if [ -s "$OUT" ]; then
-        LCNT=$(wcl "$OUT")
-        echo -e "QC1 *.snvs.anno.txt $OK ${YEL}${LCNT} genes${NOC}"
-    else
-        echo -e "QC1 *.snvs.anno.txt $ERR"
-    fi
-fi
-
-if $QC2 ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/exome_QC_plots/${PATIENT}
-
-    while IFS=$'\t' read -r ID _ _ SAMP
-    do
-        ### Expected output
-        #OUT=${WORKDIR}/${ID}.bwa.realigned.rmDups.recal.bam.hist
-        OUT=${WORKDIR}/${ID}.${RECAL_BAM_EXT}.bam.hist
-        if [ -r "$OUT" ]; then
-				LCNT=$(wcl "$OUT")
-            echo -e "QC2 hist $ID $OK ${YEL}${LCNT}${NOC}"
-        else
-            echo -e "QC2 hist $ID $ERR"
-        fi
-    done < "${PATIENT}.temp.conversions.txt"
-fi
-
-if $QC3 ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/exome_QC_plots/${PATIENT}
-    ## Expected output:
-    OUT1=${WORKDIR}/${PATIENT}.qualityinfo.txt
-    if [ -s "$OUT1" ]; then
-        LCNT=$(wcl "$OUT1")
-        echo -e "QC3 info $OK ${YEL}${LCNT}${NOC}"
-    else
-        echo -e "QC3 info $ERR"
-    fi
-    OUT2=${WORKDIR}/${PATIENT}.qualitystats.txt
-    if [ -s "$OUT2" ]; then
-        LCNT=$(wcl "$OUT2")
-        echo -e "QC3 stats $OK ${YEL}${LCNT}${NOC}"
-    else
-        echo -e "QC3 stats $ERR"
-    fi
-
-	for DIR in libraryQuality VAFPatterns  variantQuality  variantSpectra
-	do
-    res=false
-    for ff in "${WORKDIR}/${PATIENT}_qualplots/${DIR}/"*.pdf; do
-        if [ -s "$ff" ]; then
-            res=true
-        else
-            res=false
-        break
-        fi
-    done
-    if $res; then
-        echo -e "QC3 ${DIR} plots $OK"
-    else
-        echo -e "QC3 ${DIR} plots $ERR"
-    fi
-	done
-
-    OUT3=${WORKDIR}/${PATIENT}_qualplots/VAFPatterns/TERTp.pdf
-    if [ -s "$OUT3" ]; then
-        #LCNT=$(wcl "$OUT2")
-        echo -e "QC3 VAFPatterns/TERTp.pdf $OK ${YEL}${NOC}"
-    else
-        echo -e "QC3 VAFPatterns/TERTp.pdf $ERR"
-    fi
 fi
 
 

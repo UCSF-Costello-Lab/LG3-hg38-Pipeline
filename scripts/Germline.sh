@@ -20,17 +20,27 @@ ncores=${SLURM_NTASKS:-1}
 VERBOSITY=ERROR
 CLEAN=true
 
+TMP_DIR="${LG3_SCRATCH_ROOT}/tmp"
+make_dir "${TMP_DIR}"
+
 ### Debug
 if $LG3_DEBUG ; then
   echo "$PROG Settings:"
   echo "- LG3_HOME=$LG3_HOME"
   echo "- LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
   echo "- LG3_SCRATCH_ROOT=$LG3_SCRATCH_ROOT"
+  echo "- TMP_DIR=$TMP_DIR"
   echo "- PWD=$PWD"
   echo "- USER=$USER"
   echo "- hostname=$(hostname)"
   echo "- ncores=$ncores"
 fi
+
+#module load gatk/4.3.0.0
+echo "GATK4 = ${GATK4}"
+module load openjdk/1.8.0
+echo "Java : "
+java -version 2>&1
 
 ## Input
 nbamfile=$1
@@ -62,10 +72,7 @@ assert_file_exists "${REF}"
 ## Software
 PYTHON_VCF_GERMLINE=${LG3_HOME}/scripts/vcf_germline.py
 echo "Software:"
-#echo "- JAVA=${JAVA:?}"
-#echo "- PYTHON=${PYTHON:?}"
 echo "- GATK=${GATK4:?}"
-#assert_python "$PYTHON"
 
 
 ## Assert existance of software
@@ -89,15 +96,16 @@ HaplotypeCaller() {
 	echo "Processing ${ID} ..."
    { time ${GATK4} HaplotypeCaller \
       --verbosity ${VERBOSITY} \
-		-L ${ILIST} \
-		-ip ${PADDING} \
+		--tmp-dir "${TMP_DIR}" \
+		-L "${ILIST}" \
+		-ip "${PADDING}" \
       -R "${REF}" \
 		-I "$1" \
       -O "${ID}.g.vcf" \
       -ERC GVCF; } 2>&1 || error "HaplotypeCaller FAILED"
    assert_file_exists "${ID}.g.vcf"
 	echo -ne "Called ${ID}.g.vcf : "
-	grep -cv '^#' ${ID}.g.vcf
+	grep -cv '^#' "${ID}".g.vcf
    echo "****** HaplotypeCaller Completed! ******"
 }
 CombineGVCFs() {
@@ -105,6 +113,7 @@ CombineGVCFs() {
 	# shellcheck disable=SC2086
 	{ time ${GATK4} CombineGVCFs \
    	--verbosity ${VERBOSITY} \
+		--tmp-dir ${TMP_DIR} \
 		-L "${ILIST}" \
 		-ip ${PADDING} \
    	-R "${REF}" \
@@ -133,16 +142,16 @@ OUT=${PATIENT}.raw.vcf
 echo -e "\\n\\n****** GenotypeGVCFs : Joint genotyping on a single-sample GVCFs ******"
 { time ${GATK4} GenotypeGVCFs \
    --verbosity ${VERBOSITY} \
+	--tmp-dir "${TMP_DIR}" \
    -R "${REF}" \
 	-L "${ILIST}" \
-	-ip ${PADDING} \
+	-ip "${PADDING}" \
    -O "${OUT}" \
    --variant "${PATIENT}.g.vcf"; } 2>&1 || error "GenotypeGVCFs FAILED"
 assert_file_exists "${OUT}"
 echo -ne "\\nRaw VCF : ${OUT} : "
-grep -vc '^#' ${OUT}
+grep -vc '^#' "${OUT}"
 echo -e "****** GenotypeGVCFs Completed! ******\\n"
-
 
 ## Construct string with one or more '-I <bam>' elements
 INPUTS_BAM=$(for i in "${bamdir}"/*."${RECAL_BAM_EXT}.bam"
@@ -154,12 +163,13 @@ echo "INPUTS_BAM ${INPUTS_BAM}"
 
 echo -e "\\n\\n****** VariantAnnotator : ******"
 OUT=${PATIENT}.annotated.vcf
-# shellcheck disable=SC2086
 	#-L "${PATIENT}.raw.vcf" \
 	#-L "${ILIST}" \
 	#-ip "${PADDING}" \
+# shellcheck disable=SC2086
 { time ${GATK4} VariantAnnotator \
    --verbosity ${VERBOSITY} \
+	--tmp-dir "${TMP_DIR}" \
    -R "${REF}" \
 	${INPUTS_BAM} \
 	-V "${PATIENT}.raw.vcf" \
@@ -182,6 +192,7 @@ echo -e "\\n\\n****** VariantFiltration : ******"
 OUT="${PATIENT}.filtered.vcf"
 { time ${GATK4} VariantFiltration \
    --verbosity ${VERBOSITY} \
+	--tmp-dir "${TMP_DIR}" \
    -R "${REF}" \
 	-V "${PATIENT}.annotated.vcf" \
 	-L "${ILIST}" \
@@ -211,6 +222,7 @@ echo -e "\\n\\n****** SelectVariants : SNPs only ******"
 OUT="${PATIENT}.filtered.snps.vcf"
 { time ${GATK4} SelectVariants \
    --verbosity ${VERBOSITY} \
+	--tmp-dir "${TMP_DIR}" \
    -R "${REF}" \
 	-L "${ILIST}" \
 	-ip "${PADDING}" \
@@ -245,20 +257,19 @@ rm -f "NOR-${normalname}_vs_${normalname}.germline"
 
 echo "[Germline] Results:"
 #grep Tumor -- *.germline
-cat *.germline
+cat ./*.germline
 
 echo "[Germline] Finished!"
 echo "-------------------------------------------------"
 
 if ${CLEAN} ; then
 	echo "Deleting temp files..."
-	rm -f *.g.vcf
-	rm -f *.g.vcf.idx
-	rm -f ${PATIENT}.annotated.vcf
-	rm -f ${PATIENT}.annotated.vcf.idx
-	rm -f ${PATIENT}.raw.vcf
-	rm -f ${PATIENT}.raw.vcf.idx
+	rm -f ./*.g.vcf
+	rm -f ./*.g.vcf.idx
+	rm -f "${PATIENT}".annotated.vcf
+	rm -f "${PATIENT}".annotated.vcf.idx
+	rm -f "${PATIENT}".raw.vcf
+	rm -f "${PATIENT}".raw.vcf.idx
 fi
-
 
 echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

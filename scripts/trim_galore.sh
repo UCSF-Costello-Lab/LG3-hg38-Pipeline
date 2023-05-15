@@ -17,7 +17,7 @@ LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
 LG3_DEBUG=${LG3_DEBUG:-true}
 
 ### Debug
-if [ $LG3_DEBUG = true ]; then
+if "$LG3_DEBUG" ; then
   echo "Settings:"
   echo "- LG3_HOME=${LG3_HOME:?}"
   echo "- LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:?}"

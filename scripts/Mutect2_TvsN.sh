@@ -13,6 +13,12 @@ echo "Call: ${BASH_SOURCE[*]}"
 echo "Script: $PROGRAM"
 echo "Arguments: $*"
 
+#module load gatk/4.3.0.0
+echo "GATK4 = ${GATK4}"
+module load openjdk/1.8.0
+echo "Java : "
+java -version
+
 ### Configuration
 LG3_HOME=${LG3_HOME:?}
 LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
@@ -21,12 +27,16 @@ LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
 LG3_DEBUG=${LG3_DEBUG:-true}
 ncores=${SLURM_NTASKS:-1}
 
+TMP_DIR="${LG3_SCRATCH_ROOT}/tmp"
+make_dir "${TMP_DIR}"
+
 ### Debug
 if $LG3_DEBUG ; then
   echo "Settings:"
   echo "- LG3_HOME=${LG3_HOME}"
   echo "- LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT}"
   echo "- LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT}"
+  echo "- TMP_DIR=${TMP_DIR}"
   echo "- PWD=$PWD"
   echo "- USER=${USER}"
   echo "- hostname=$(hostname)"
@@ -112,6 +122,7 @@ echo -e "\\n\\n****** Somatic variations using MuTect2! ******"
 
 { time ${GATK4} --java-options "-Xms64G -Xmx64G" Mutect2 \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       -R "${REF}" \
       -L "${INT}" \
 		-ip "${PADDING}" \
@@ -131,6 +142,7 @@ echo "****** MuTect2 Completed! ******"
 echo -e "\\n\\n****** Pass raw data to LearnReadOrientationModel ******"
 { time ${GATK4} LearnReadOrientationModel \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       -I f1r2.tar.gz \
       -O read-orientation-model.tar.gz; } 2>&1 || error "LearnReadOrientationModel FAILED"
 assert_file_exists read-orientation-model.tar.gz
@@ -139,6 +151,7 @@ echo "****** LearnReadOrientationModel Completed! ******"
 echo -e "\\n\\n****** Normal GetPileupSummaries on known variant sites.******"
 { time ${GATK4} GetPileupSummaries \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       -I "${nbamfile}" \
       -V "${COMMON}" \
       -L "${COMMON}" \
@@ -151,6 +164,7 @@ echo "****** Normal GetPileupSummaries Completed! ******"
 echo -e "\\n\\n****** Tumor GetPileupSummaries on known variant sites.******"
 { time ${GATK4} GetPileupSummaries \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       -I "${tbamfile}" \
       -V "${COMMON}" \
       -L "${COMMON}" \
@@ -163,6 +177,7 @@ echo "****** Tumor GetPileupSummaries Completed! ******"
 echo -e "\\n\\n****** Estimate contamination with CalculateContamination.******"
 { time ${GATK4} CalculateContamination \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       -I "${prefix}".tumor_pileup.table \
       --matched-normal "${prefix}".normal_pileup.table \
       --tumor-segmentation "${prefix}".segments.table \
@@ -176,6 +191,7 @@ echo "****** CalculateContamination Completed! ******"
 echo -e "\\n\\n****** Pass learned read orientation model to FilterMutectCallswith ******"
 { time ${GATK4} FilterMutectCalls \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       -R "${REF}" \
       -L "${INT}" \
 		-ip "${PADDING}" \
@@ -196,6 +212,7 @@ echo "- FUNCO_PATH=${FUNCOTATOR}"
 echo -e "\\n\\n****** Run Funcotator ******"
 { time ${GATK4} Funcotator \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       --variant "${prefix}".filtered.vcf \
       --reference "${REF}" \
       --ref-version hg38 \
@@ -213,6 +230,7 @@ OUT="${prefix}".variants.funcotated.tsv
 
 { time ${GATK4} VariantsToTable \
       --verbosity ${VERBOSITY} \
+		--tmp-dir "${TMP_DIR}" \
       -R "${REF}" \
       -V "${prefix}".variants.funcotated.vcf \
       -F FUNCOTATION \
