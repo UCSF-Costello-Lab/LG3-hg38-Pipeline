@@ -10,7 +10,7 @@ Required software and resources are listed in `lg3.conf`.
 Edit as needed. Most software is available on C4 as loadable modules.
 Currenly using `gatk/4.3.0.0`
 
-## Preparations in workspace directory, e.g. ./runs_demo
+## Preparation of workspace directory, e.g. ./runs_demo
 
 1. Create sample table with 4 colums and the following headers:
 "[lib_ID]	[SF]	[patient_ID]	[sample_type]"
