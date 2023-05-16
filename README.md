@@ -6,19 +6,20 @@
 
 Clone repositary in designated directory
 
-Required software and resources are listed in lg3.conf.
+Required software and resources are listed in `lg3.conf`.
 Edit as needed. Most software is available on C4 as loadable modules.
-Currenly using gatk/4.3.0.0
+Currenly using `gatk/4.3.0.0`
 
 ## Preparations in workspace directory, e.g. ./runs_demo
 
 1. Create sample table with 4 colums and the following headers:
-"[lib_ID	SF	patient_ID	sample_type]"
-e.g. patient_ID_conversions.tsv
-NOTE: every patient must have a single "Normal" sample!
+"[lib_ID]	[SF]	[patient_ID]	[sample_type]"
+e.g. `patient_ID_conversions.tsv`
+
+NOTE: every patient must have a single sample_type == "Normal" sample!
 
 2. Create run-time config file to set some env variables,
-e.g. run.conf
+e.g. `run.conf`
 
 ```sh
 	export LG3_HOME=/PATH/TO/ROOT/PIPELINE/DIRECTORY
@@ -104,5 +105,4 @@ Note: 4, 5 and 6 could be run in parallel
 	- create_input_snp_pileup.py (custom)
 	- snp_pileup (htstools)
 	- runFACETS.R (facets R package)
-
 
