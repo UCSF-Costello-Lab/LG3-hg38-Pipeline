@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ ! -r "$1" ]; then
+	echo "Usage: $0 *_multi.alignment_summary_metrics"	
+	exit 1
+fi
+
+B=$(basename "$1" .txt)
+echo ${B}
+OUT=${B}_report
+
+echo "==== Alignment report human readable ====" > ${OUT}
+grep -A3 CATEGORY "$1" | trans | head -n 1 >> ${OUT}
+grep -A3 CATEGORY "$1" | trans | awk '{ printf("%s\t%'"'"'f\t%'"'"'f\t%'"'"'f\n", $1,$2,$3,$4) }' | tail -n +2 | sed 's/.000000//g' >> ${OUT}
+head -n 37 ${OUT}
+wc -l ${OUT}
