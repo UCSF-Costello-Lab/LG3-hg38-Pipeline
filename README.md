@@ -1,6 +1,6 @@
 ## LG3-hg38-Pipeline
 
-## HG38 version of the original LG3 Pipeline.
+## Simplified HG38 version of the original LG3 Pipeline.
 
 ## Installation
 
@@ -91,7 +91,7 @@ Note: 4, 5 and 6 could be run in parallel
 	- SelectVariants - SNPs (gatk)
 	- check relatedness (custom)
 
-4. Mutect2_TvsN.sh
+4. Mutect2_TvsN.sh (tumor-normal pairs)
 	- Mutect2 (gatk)
 	- LearnReadOrientationModel (gatk)
 	- GetPileupSummaries: Normal (gatk)
@@ -101,7 +101,7 @@ Note: 4, 5 and 6 could be run in parallel
 	- Funcotator (gatk)
 	- VariantsToTable (gatk)
 	
-5. FACETS
+5. FACETS (all samples together)
 	- create_input_snp_pileup.py (custom)
 	- snp_pileup (htstools)
 	- runFACETS.R (facets R package)
