@@ -4,7 +4,8 @@
 
 ## Installation
 
-Clone repositary in designated directory
+Clone repositary in designated directory, e.g.
+`git clone https://github.com/UCSF-Costello-Lab/LG3-hg38-Pipeline.git`
 
 Required software and resources are listed in `lg3.conf`.
 Edit as needed. Most software is available on C4 as loadable modules.
