@@ -1,0 +1,47 @@
+
+Pindel
+
+_run_Pindel --> pindel_all.pbs
+
+	pindel_setup.sh
+		= ${PATIENT}.pindel.cfg	
+
+	${PINDEL} (module pindel)
+		= ${PATIENT}.pindel
+
+	${PINDEL2VCF} (module pindel2vcf)
+		= ${PATIENT}.pindel.vcf
+
+	${PYTHON_VCF2TDT} (= vcf2tdt.py)
+		= ${PATIENT}.pindel.vcf.tdt == ${PATIENT}.indels
+
+	${SH_PINDEL_FILTER} (= pindel_filter.sh)
+		${PYTHON_PINDEL_FILTER} (= pindel_filter.py)
+			= ${datafile}.filter
+
+		${BEDTOOLS} (module bedtools)
+			= ${datafile}.filter.intersect
+
+	${SH_PINDEL_ANNOTATE} (= pindel_annotate.sh)
+		annotate_variation.pl 
+
+		annotation_COSMIC.py
+		annotation_KINASE.py
+		annotation_CANCER.py
+			
+
+==============================================
+
+Simple large deletions
+medium size insertions
+
+user defined Maximum Deletion Size
+
+*D   = Large Deletions
+*SI  = Short insertions
+LI  = Long insertions
+*INV = Inversions
+TD  = Tandem duplications
+BP  = breakpoints
+*RP  = split-read evidence of larger variants
+

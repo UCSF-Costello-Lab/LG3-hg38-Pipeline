@@ -2,7 +2,7 @@
 
 # shellcheck source=scripts/utils.sh
 source "${LG3_HOME:?}/scripts/utils.sh"
-source_lg3_conf
+#source_lg3_conf
 
 assert_pwd
 clean-logs

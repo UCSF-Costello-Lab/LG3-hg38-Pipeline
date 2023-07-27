@@ -20,7 +20,7 @@ LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
 LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
 LG3_DEBUG=${LG3_DEBUG:-true}
 ncores=${SLURM_NTASKS:-1}
-assert_file_exists "${ILIST:?}"
+assert_file_exists "${ILIST2:?}"
 
 TMP_DIR="${LG3_SCRATCH_ROOT}/$SAMPLE/tmp"
 make_dir "${TMP_DIR}"
@@ -38,7 +38,7 @@ if $LG3_DEBUG ; then
   echo "- ncores=$ncores"
   echo "- XMX=${XMX}"
   echo "- CLEAN=${CLEAN}"
-  #echo "- ILIST=${ILIST:?}"
+  echo "- ILIST2=${ILIST2:?}"
   #echo "- PADDING=${PADDING:?}"
 fi
 
@@ -80,8 +80,6 @@ echo -e "\\n\\n****** BWA-MEM Alignment ******"
    "${REF}" "${fastq1}" "${fastq2}" > "${OUT}"; } 2>&1 || error "BWA-MEM FAILED"
 assert_file_exists "${OUT}"
 
-#samtools flagstat ${OUT} > ${OUT}.flagstat
-#cat ${OUT}.flagstat
 echo "****** BWA-MEM Completed! ******"
 
 if ${CLEAN}; then
@@ -161,7 +159,7 @@ if ${CLEAN}; then
    rm -f "${S}_m.bam"
 fi
 
-samtools flagstat "${S}"_md.bam > "${S}"_md.bam.flagstat
+${SAMTOOLS} flagstat "${S}"_md.bam > "${S}"_md.bam.flagstat
 echo "Flagstat after MarkDuplicates"
 cat "${S}"_md.bam.flagstat
 
@@ -259,7 +257,7 @@ echo -e "\\n\\n****** CollectHsMetrics : ******"
    -I "${S}.${RECAL_BAM_EXT}".bam; } 2>&1 || error "CollectHsMetrics FAILED"
 echo "****** CollectHsMetrics Completed! ******"
 
-samtools flagstat "${S}.${RECAL_BAM_EXT}".bam > "${S}.${RECAL_BAM_EXT}".flagstat
+${SAMTOOLS} flagstat "${S}.${RECAL_BAM_EXT}".bam > "${S}.${RECAL_BAM_EXT}".flagstat
 echo "Flagstat after BQSRecalibration"
 cat "${S}.${RECAL_BAM_EXT}".flagstat
 

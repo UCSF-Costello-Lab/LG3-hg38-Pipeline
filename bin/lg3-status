@@ -142,7 +142,8 @@ if $BWA ; then
     while IFS=$'\t' read -r ID _ _ SAMP
     do
         ### Expected output
-        OUT=${WORKDIR}/${PATIENT}/${ID}_final.bam.flagstat
+        #OUT=${WORKDIR}/${PATIENT}/${ID}_final.bam.flagstat
+        OUT=${WORKDIR}/${PATIENT}/${ID}.bwa.mrkDups.sort.recal.flagstat
         if [ -s "$OUT" ]; then
             echo -e "BWA $ID $OK"
         else
