@@ -1,0 +1,45 @@
+#!/bin/bash
+## Colors and colored messages
+RED='\033[0;31m'
+GRN='\033[0;32m'
+#YEL='\033[0;33m'
+NOC='\033[0m'
+OK="${GRN} OK${NOC}"
+ERR="${RED} MISSING${NOC}"
+#SEP="$YEL******$NOC"
+
+DIR=/costellolab/data4/LG3_hg38_output/LG4/pindel
+
+#PAT=Patient564
+PAT=${PATIENT:?}
+
+VCF_ALL=()
+for CH in {1..22} X Y
+do
+	VCF="${PAT}.pindel.chr${CH}.vcf"
+	VCF_FULL="${DIR}/${PAT}_pindel_chr${CH}/${VCF}"
+	VCF_ALL+=(${VCF_FULL})
+	echo -n "Testing ${VCF} ..."
+	if [ -f "${VCF_FULL}" ]; then
+		echo -e "\t${OK}"
+		grep -vc '^#' ${VCF_FULL}
+	else
+		echo -e "\t${ERR}"
+		exit 1
+	fi
+done
+
+#echo "VCF_ALL == ${VCF_ALL[@]}"
+
+OUT="${DIR}/${PAT}_pindel"
+mkdir -p ${OUT}
+
+CH=1
+grep '^#' "${DIR}/${PAT}_pindel_chr${CH}/${PAT}.pindel.chr${CH}.vcf" > "${OUT}/${PAT}.pindel.vcf"
+cat "${VCF_ALL[@]}" | grep -v '^#' >> "${OUT}/${PAT}.pindel.vcf"
+
+#echo -n "Total indels "
+#grep -vc '^#' "${PAT}.pindel.vcf" 
+echo -n "Total indels in "
+ls "${OUT}/${PAT}.pindel.vcf"
+grep -vc '^#' "${OUT}/${PAT}.pindel.vcf" 

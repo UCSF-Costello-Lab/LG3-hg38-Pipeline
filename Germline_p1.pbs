@@ -1,0 +1,72 @@
+#!/bin/bash
+
+### Usage: qsub -N Job_Name -v BAMS=/path/to/file1.bam:/path/to/file2.bam:...,NORMAL=AXXXXXX,PATIENT=PatientXX,ILIST=/path/to/exome_kit.interval_list /path/to/Germline.pbs
+### Output files
+#PBS -e _Germline_${PATIENT}.err
+#PBS -o _Germline_${PATIENT}.out
+#PBS -l nodes=1:ppn=8,vmem=100gb
+#PBS -l walltime=2-10:00:00
+#PBS -l mem=100gb
+#PBS -m ae
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+### Configuration
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+PROJECT=${PROJECT:-LG3}
+EMAIL=${EMAIL:?}
+LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
+LG3_DEBUG=${LG3_DEBUG:-true}
+NODES=$(hostname)
+
+
+### Debug
+if [[ $LG3_DEBUG ]]; then
+  echo "LG3_HOME=$LG3_HOME"
+  echo "LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
+  echo "EMAIL=${EMAIL}"
+#  echo "LG3_SCRATCH_ROOT=$LG3_SCRATCH_ROOT"
+  echo "PWD=$PWD"
+  echo "USER=$USER"
+fi
+
+
+## Input
+echo "Input:"
+echo "- SAMPLE=${SAMPLE:?}"
+echo "- PATIENT=${PATIENT:?}"
+echo "- ILIST=${ILIST:?}"
+
+assert_file_exists "${ILIST}"
+ILIST=$(readlink -e "${ILIST:?}") ## Absolute path
+
+## Software
+SH_GERMLINE=${LG3_HOME}/scripts/Germline_p1.sh
+assert_file_executable "${SH_GERMLINE}"
+
+
+WDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/germline/${PATIENT}
+make_dir "${WDIR}"
+change_dir "${WDIR}"
+
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
+echo "Started $PROG on $DATE"
+echo "Using node(s): $NODES"
+
+assert_file_exists "${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}/${SAMPLE}.${RECAL_BAM_EXT}.bam"
+
+"${SH_GERMLINE}" \
+      "${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}/${SAMPLE}.${RECAL_BAM_EXT}.bam" \
+      "${PATIENT}" \
+      "$ILIST"
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

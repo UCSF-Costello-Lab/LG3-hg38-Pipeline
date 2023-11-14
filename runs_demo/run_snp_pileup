@@ -1,0 +1,14 @@
+#!/bin/bash
+
+ls -l /costellolab/data1/hs38_gatk_resource/common_all_20180418.vcf.gz
+ls -l /costellolab/data4/LG3_hg38_output/LG4/bwa-mem/Patient565/Y00121.bwa.mrkDups.sort.recal.bam
+ls -l /costellolab/data4/LG3_hg38_output/LG4/bwa-mem/Patient565/Y00122.bwa.mrkDups.sort.recal.bam
+ls -l /home/jocostello/shared/LG3_Pipeline_HIDE/resources/commonSNPs/hg19/00-common_all.vcf
+       #/costellolab/data1/hs38_gatk_resource/common_all_20180418.vcf \
+
+snp-pileup -g -q15 -Q20 -P100 -r25,0 -d1000 \
+		 /costellolab/data1/hs38_gatk_resource/common_all_20180418.vcf \
+       Patient565_Primary_Y00121_vs_Y00122 \
+       /costellolab/data4/LG3_hg38_output/LG4/bwa-mem/Patient565/Y00121.bwa.mrkDups.sort.recal.bam \
+       /costellolab/data4/LG3_hg38_output/LG4/bwa-mem/Patient565/Y00122.bwa.mrkDups.sort.recal.bam 
+

@@ -1,0 +1,176 @@
+#!/bin/bash
+### Usage: qsub -v PATIENT=PatientXX,PROJECT=LG3orGBM,CONV=patient_ID_conversions.tsv /path/to/pindel_all.pbs
+#PBS -N ${PATIENT}.pindel
+#PBS -e _Pindel_${PATIENT}.err
+#PBS -o _Pindel_${PATIENT}.out
+#PBS -l nodes=1:ppn=16,vmem=128gb
+#PBS -l walltime=14-00:00:00
+#PBS -l mem=128gb
+#PBS -m ae
+
+# shellcheck source=scripts/utils.sh
+source "${LG3_HOME:?}/scripts/utils.sh"
+source_lg3_conf
+
+PROGRAM=${BASH_SOURCE[0]}
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"
+echo "Call: ${BASH_SOURCE[*]}"
+echo "Script: $PROGRAM"
+echo "Arguments: $*"
+
+### Configuration
+LG3_HOME=${LG3_HOME:?}
+LG3_OUTPUT_ROOT=${LG3_OUTPUT_ROOT:-output}
+LG3_INPUT_ROOT=${LG3_INPUT_ROOT:-${LG3_OUTPUT_ROOT}}
+EMAIL=${EMAIL:?}
+PROJECT=${PROJECT:-LG3}
+CONV=${CONV:-patient_ID_conversions.tsv}
+LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
+LG3_DEBUG=${LG3_DEBUG:-true}
+ncores=${SLURM_NTASKS:-1}
+
+### Debug
+if [[ $LG3_DEBUG ]]; then
+  echo "Settings:"
+  echo "- LG3_HOME=$LG3_HOME"
+  echo "- LG3_INPUT_ROOT=$LG3_INPUT_ROOT"
+  echo "- LG3_OUTPUT_ROOT=$LG3_OUTPUT_ROOT"
+  echo "- EMAIL=${EMAIL}"
+  echo "- LG3_SCRATCH_ROOT=$LG3_SCRATCH_ROOT"
+  echo "- PWD=$PWD"
+  echo "- USER=$USER"
+  echo "- hostname=$(hostname)"
+  echo "- ncores=$ncores"
+  echo "- samtools ${SAMTOOLS_OLD}"
+fi
+
+assert_directory_exists "${LG3_INPUT_ROOT}"
+assert_directory_exists "${LG3_OUTPUT_ROOT}"
+LG3_INPUT_ROOT=$(readlink -e "${LG3_INPUT_ROOT}") ## Absolute path
+LG3_OUTPUT_ROOT=$(readlink -e "${LG3_OUTPUT_ROOT}") ## Absolute path
+
+### Input
+echo "Input:"
+echo "- PATIENT=${PATIENT:?}"
+echo "- PROJECT=${PROJECT:?}"
+echo "- CONV=${CONV:?}"
+
+assert_patient_name "${PATIENT}"
+assert_file_exists "${CONV}"
+CONV=$(readlink -e "${CONV:?}") ## Absolute path
+
+echo "PINDEL"
+echo "Patient: ${PATIENT}"
+echo "Project: ${PROJECT}"
+echo "Conversion File: ${CONV}"
+echo "----------------------------------"
+
+SH_PINDEL_SETUP=${LG3_HOME}/scripts/pindel_setup.sh
+SH_PINDEL_FILTER=${LG3_HOME}/scripts/pindel_filter.sh
+SH_PINDEL_ANNOTATE=${LG3_HOME}/scripts/pindel_annotate.sh
+PYTHON_VCF2TDT=${LG3_HOME}/scripts/vcf2tdt.py
+unset PYTHONPATH  ## ADHOC: In case it is set by user. /HB 2018-09-13
+
+echo "Software:"
+echo "- PINDEL=${PINDEL:?}"
+echo "- PINDEL2VCF=${PINDEL2VCF:?}"
+echo "- ANNOVAR_HOME=${ANNOVAR_HOME:?}"
+assert_file_executable  "${PINDEL}"
+assert_file_executable  "${PINDEL2VCF}"
+assert_directory_exists "$ANNOVAR_HOME"
+assert_file_executable  "${SH_PINDEL_SETUP}"
+assert_file_executable  "${SH_PINDEL_FILTER}"
+assert_file_executable  "${SH_PINDEL_ANNOTATE}"
+assert_file_executable  "${PYTHON_VCF2TDT}"
+
+echo "References:"
+echo "- REF=${REF:?}"
+echo "- ILIST=${ILIST:?}"
+assert_file_exists "${REF}"
+assert_file_exists "${ILIST}"
+
+## check up output directory
+WDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/pindel
+assert_file_exists ${WDIR}/${PATIENT}.pindel.cfg
+assert_file_exists ${WDIR}/${PATIENT}_pindel/${PATIENT}.pindel.vcf
+
+## set up scratch directory
+make_dir "${LG3_SCRATCH_ROOT}/${PATIENT}_pindel"
+change_dir "${LG3_SCRATCH_ROOT}"
+
+cp ${WDIR}/${PATIENT}.pindel.cfg .
+
+## setup pindel cfg file
+#date
+#echo -e "\\n========= [Setup] Make pindel cfg file in ${LG3_SCRATCH_ROOT}"
+
+#"${SH_PINDEL_SETUP}" "${PATIENT}" "${PROJECT}" "${CONV}"  || error "${SH_PINDEL_SETUP} failed"
+assert_file_exists "${PATIENT}.pindel.cfg"
+
+echo "Pindel config: "
+cat "${PATIENT}.pindel.cfg"
+
+## run pindel
+
+change_dir "${PATIENT}_pindel"
+cp ${WDIR}/${PATIENT}_pindel/${PATIENT}.pindel.vcf .
+
+echo -e "\\n========= [Pindel] Run pindel"
+
+echo -n "Pindel version "
+${PINDEL} | head -1
+
+	##--exclude ${TELO_CENT} \
+	##--include ${ILIST} \
+#${PINDEL} -f "$REF" -i "${LG3_SCRATCH_ROOT}/${PATIENT}.pindel.cfg" \
+	#-c ALL \
+	#-o "${PATIENT}.pindel" \
+	#--minimum_support_for_event 3 \
+	#--report_inversions FALSE \
+	#--report_duplications FALSE \
+	#--report_long_insertions FALSE \
+	#--report_breakpoints FALSE \
+	#-T "${ncores}"  || error "${PINDEL} failed"
+#
+#for EXT in D INV SI
+#do
+	#assert_file_exists "${PATIENT}.pindel_${EXT}"
+#done
+#
+### convert to vcf
+#echo -e "\\n========= [Pindel] Convert pindel to vcf"
+#${PINDEL2VCF} -P "${PATIENT}.pindel" -r "$REF" -R hg38 -d 20131231 -v "${PATIENT}.pindel.vcf" -G  || error "${PINDEL2VCF} failed"
+#assert_file_exists "${PATIENT}.pindel.vcf"
+#echo "[Pindel] Generated VCF: "
+#wc -l "${PATIENT}.pindel.vcf"
+
+## convert to tdt
+echo -e "\\n========= [Pindel] Fix vcf (needed for new pindel)"
+grep -v ID=PL "${PATIENT}.pindel.vcf" | grep -v ID=RD | grep -v ID=PF > "${PATIENT}.pindel.vcf.fixed"
+mv "${PATIENT}.pindel.vcf.fixed" "${PATIENT}.pindel.vcf"
+
+echo -e "\\n========= [Pindel] Convert vcf to tdt"
+"${PYTHON_VCF2TDT}" "${PATIENT}.pindel.vcf"  || error "${PYTHON_VCF2TDT} failed"
+assert_file_exists "${PATIENT}.pindel.vcf.tdt"
+
+mv "${PATIENT}.pindel.vcf.tdt" "${PATIENT}.indels"
+assert_file_exists "${PATIENT}.indels"
+
+## filter pindel data
+echo -e "\\n========= [Filter] Filter pindel output using target $ILIST"
+"${SH_PINDEL_FILTER}" "${PATIENT}.indels" "${PROJECT}" "${ILIST}"  || error "${SH_PINDEL_FILTER} failed"
+
+## annotate (annovar, kinase, cosmic, etc) and filter
+echo -e "\\n========= [Annotate] Annotate indels and apply annotation-based filters"
+"${SH_PINDEL_ANNOTATE}" "${PATIENT}.indels" "${PROJECT}"  || error "${SH_PINDEL_ANNOTATE} failed"
+
+## move from scratch to project folder
+cp -a "${LG3_SCRATCH_ROOT}"/* "${WDIR}"
+
+#echo "Cleaning: rm ${LG3_SCRATCH_ROOT} ..."
+#rm -rf "${LG3_SCRATCH_ROOT}"
+
+echo "[Pindel] Output is in ${WDIR}"
+ls -l "${WDIR}/${PATIENT}_pindel"
+
+echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"
