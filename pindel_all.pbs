@@ -118,14 +118,14 @@ ${PINDEL} | head -1
 
 	##--exclude ${TELO_CENT} \
 	##--include ${ILIST} \
-${PINDEL} -f "$REF" -i "${LG3_SCRATCH_ROOT}/${PATIENT}.pindel.cfg" -c ALL \
+${PINDEL} -f "$REF" -i "${LG3_SCRATCH_ROOT}/${PATIENT}.pindel.cfg" \
+	-c ALL \
 	-o "${PATIENT}.pindel" \
 	--minimum_support_for_event 3 \
 	--report_inversions FALSE \
 	--report_duplications FALSE \
 	--report_long_insertions FALSE \
 	--report_breakpoints FALSE \
-	--include ${ILIST} \
 	-T "${ncores}"  || error "${PINDEL} failed"
 
 for EXT in D INV SI

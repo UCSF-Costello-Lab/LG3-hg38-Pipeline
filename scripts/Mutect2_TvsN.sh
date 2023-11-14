@@ -17,7 +17,7 @@ echo "Arguments: $*"
 echo "GATK4 = ${GATK4}"
 module load openjdk/1.8.0
 echo "Java : "
-java -version
+java -version 2>&1
 
 ### Configuration
 LG3_HOME=${LG3_HOME:?}

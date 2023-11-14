@@ -34,6 +34,8 @@ echo "- EMAIL=${EMAIL}"
 echo "- PROJECT=${PROJECT:?}"
 echo "- PATIENT=${PATIENT:?}"
 echo "- CONV=${CONV:?}"
+echo "- ILIST=${ILIST:?}"
+echo "- ILIST2=${ILIST2:?}"
 
 assert_patient_name "${PATIENT}"
 
@@ -76,7 +78,8 @@ do
   #ALIGNED=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}
   echo "Submitting $SAMPLE ..."
   # shellcheck disable=SC2086
-  qsub ${QSUB_OPTS} -N Al${SAMPLE} -v "${QSUB_ENVVARS},FASTQ1=${FASTQ1},FASTQ2=${FASTQ2},SAMPLE=${SAMPLE},PATIENT=${PATIENT},PROJECT=${PROJECT}" "${PBS}"
+  #qsub ${QSUB_OPTS} -N Al${SAMPLE} -v "${QSUB_ENVVARS},FASTQ1=${FASTQ1},FASTQ2=${FASTQ2},SAMPLE=${SAMPLE},PATIENT=${PATIENT},PROJECT=${PROJECT}" "${PBS}"
+  qsub ${QSUB_OPTS} -N Al${SAMPLE} -v "${QSUB_ENVVARS},FASTQ1=${FASTQ1},FASTQ2=${FASTQ2},SAMPLE=${SAMPLE},PATIENT=${PATIENT},PROJECT=${PROJECT},ILIST=${ILIST},ILIST2=${ILIST2}", "${PBS}"
 done
 
 echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

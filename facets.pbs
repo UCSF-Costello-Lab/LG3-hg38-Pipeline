@@ -3,7 +3,7 @@
 #PBS -e _fac_${PATIENT}.err
 #PBS -o _fac_${PATIENT}.out
 #PBS -l nodes=1:ppn=12,vmem=32gb
-#PBS -l walltime=10-00:00:00
+#PBS -l walltime=5-00:00:00
 #PBS -l mem=32gb
 #PBS -m ae
 
@@ -87,7 +87,7 @@ rm "${CONV}.${PATIENT}"
 
 CNF=${PATIENT}.snp_pileup_input.txt
 grep -w "${PATIENT}" snp_pileup_input.txt > "${CNF}"
-rm snp_pileup_input.txt
+snp_pileup_input.txt
 assert_file_exists "${CNF}"
 echo "========= Final config file:"
 cat "${CNF}"
@@ -127,6 +127,14 @@ echo "P1 --${sampleARRAY[1]}--"
 for ((i=0; i<${#patientARRAY[*]}; i++));
 do
     make_dir "${patientARRAY[i]}"
+	 echo "make_dir ${patientARRAY[i]}"
+
+    echo "${SNP_PILEUP} -g -q15 -Q20 -P100 -r25,0 -d1000 \
+			${COMMONSNPS} \
+			${patientARRAY[i]}/${patientARRAY[i]}_${sampleARRAY[i]}_${normalidARRAY[i]}_vs_${tumoridARRAY[i]} \
+			${normalbamARRAY[i]} \
+			${tumorbamARRAY[i]}"
+
     ${SNP_PILEUP} -g -q15 -Q20 -P100 -r25,0 -d1000 \
 			"${COMMONSNPS}" \
 			"${patientARRAY[i]}"/"${patientARRAY[i]}"_"${sampleARRAY[i]}"_"${normalidARRAY[i]}"_vs_"${tumoridARRAY[i]}" \

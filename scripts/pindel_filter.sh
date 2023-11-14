@@ -57,14 +57,14 @@ assert_file_exists "${datafile}"
 ### filter indels
 $PYTHON "${PYTHON_PINDEL_FILTER}" "${datafile}"
 assert_file_exists "${datafile}.filter"
-echo -n "{datafile}.filter "
+echo -n "${datafile}.filter "
 wc -l "${datafile}.filter"
 head -n 10 "${datafile}.filter"
 
 ### intersect with target sequence
 "${BEDTOOLS}" intersect -a "${datafile}.filter" -b "${interval}" -wa > "${datafile}.filter.intersect"
 assert_file_exists "${datafile}.filter.intersect"
-echo -n "{datafile}.filter.intersect "
+echo -n "${datafile}.filter.intersect "
 wc -l "${datafile}.filter.intersect"
 head -n 10 "${datafile}.filter.intersect"
 

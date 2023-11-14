@@ -121,13 +121,14 @@ do
         echo "- samp_label='${samp_label:?}'"
 	
         ## Expected output:
-        OUT=$WORKDIR/${PATIENT}.NOR-${normid}__${samp_label}-${ID}.annotated.mutations
+        #OUT=$WORKDIR/${PATIENT}.NOR-${normid}__${samp_label}-${ID}.annotated.mutations
+        OUT=$WORKDIR/NOR-${normid}__${samp_label}-${ID}.variants.funcotated.tsv
         if [ -s "$OUT" ]; then
                 warn "File $OUT exists, skipping this job ..."
         else
 				PAT=${PATIENT/atient/}
                 # shellcheck disable=SC2086
-                qsub ${QSUB_OPTS} -N "M2_${PAT}" -v "${QSUB_ENVVARS},PROJECT=${PROJECT},NORMAL=${normid},TUMOR=${ID},TYPE=${samp_label},PATIENT=${PATIENT},ILIST=$ILIST,WORKDIR=$WORKDIR,XMX=$XMX" "$PBS"
+                qsub ${QSUB_OPTS} -N "M2${ID}" -v "${QSUB_ENVVARS},PROJECT=${PROJECT},NORMAL=${normid},TUMOR=${ID},TYPE=${samp_label},PATIENT=${PATIENT},ILIST=$ILIST,WORKDIR=$WORKDIR,XMX=$XMX" "$PBS"
         fi
 
 done < "${PATIENT}.temp.conversions.txt"

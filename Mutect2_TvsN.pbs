@@ -8,7 +8,7 @@
 #PBS -o _M2_${TUMOR}.out
 #PBS -N M2
 #PBS -l nodes=1:ppn=1,vmem=256g
-#PBS -l walltime=14-00:00:00
+#PBS -l walltime=2-10:00:00
 #PBS -l mem=256gb
 #PBS -m ae
 

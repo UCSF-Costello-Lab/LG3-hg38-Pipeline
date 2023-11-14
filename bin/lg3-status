@@ -11,6 +11,7 @@
 ###  --trim            Check trimmed FASTQ files
 ###  --bwa             Check aligned BAM files
 ###  --germline        Check germline output
+###  --pindel          Check Pindel output
 ###  --mutect2         Check Mutect output
 ###  --all             Check all outputs (default)
 ###  --fac             Check FACETS outputs
@@ -45,6 +46,7 @@ TRIM=false
 BWA=false
 GL=false
 MUT=false
+PINDEL=false
 FAC=false
 
 wcl() {
@@ -62,6 +64,7 @@ case $1 in
     --trim) TRIM=true;ALL=false;shift 1;;
     --bwa) BWA=true;ALL=false;shift 1;;
     --g*) GL=true;ALL=false;shift 1;;
+	 --p*) PINDEL=true;ALL=false;shift 1;;
     --mut*) MUT=true;ALL=false;shift 1;;
     --fac) FAC=true;ALL=false;shift 1;;
     --*) echo "error: no such option $1";exit 1;;
@@ -74,8 +77,9 @@ if $ALL ; then
     TRIM=true
     BWA=true
     GL=true
+	 PINDEL=true
     MUT=true
-	 AVF=true
+	 $AVF=true
 	 FAC=true
 fi
 
@@ -153,30 +157,52 @@ if $BWA ; then
 fi
 
 if $GL ; then
-    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}/germline
+    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/germline/${PATIENT}
     OUT=${WORKDIR}/${PATIENT}.filtered.snps.vcf
     if [ -s "$OUT" ]; then
         LCNT=$(wcl "$OUT")
-        echo -e "Germline $OK ${YEL}${LCNT}${NOC}"
+        echo -e "Germline Filtered  $OK ${YEL}${LCNT}${NOC}"
     else
-        echo -e "Germline $ERR"
+        echo -e "Germline Filtered  $ERR"
     fi
 
     ## Cycle through tumors and check Germline output
     while IFS=$'\t' read -r ID _ _ SAMP
     do
+        ### Expected output
+        OUT2=${WORKDIR}/${ID}.g.vcf
+        if [ -s "${OUT2}" ]; then
+				RET=$(wcl ${OUT2})
+            echo -e "Germline1 $ID $OK ${YEL}${RET}${NOC}"
+        else
+            echo -e "Germline1 $ID $ERR"
+        fi
+
         if [ "$ID" == "$normid" ]; then continue; fi
 
-        ### Expected output
+        ### Expected output 2
         OUT=${WORKDIR}/NOR-${normid}_vs_${ID}.germline
         if [ -s "$OUT" ]; then
 				RET=$(cut -f3 -d\( "$OUT" | tail -n +2 | sed 's/)//')
-            echo -e "Germline $ID $OK ${YEL}${RET}${NOC}"
+            echo -e "Germline2 $ID $OK ${YEL}${RET}${NOC}"
         else
-            echo -e "Germline $ID $ERR"
+            echo -e "Germline2 $ID $ERR"
         fi
     done < "${PATIENT}.temp.conversions.txt"
 fi
+
+if $PINDEL ; then
+    WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/pindel/${PATIENT}_pindel
+    ## Expected output:
+    OUT=${WORKDIR}/${PATIENT}.indels.filtered.anno.txt
+    if [ -s "$OUT" ]; then
+        LCNT=$(wcl "$OUT")
+        echo -e "Pindel $OK ${YEL}${LCNT}${NOC}"
+    else
+        echo -e "Pindel $ERR"
+    fi
+fi
+
 
 if $MUT ; then
     WORKDIR=${LG3_OUTPUT_ROOT}/${PROJECT}/mutations/${PATIENT}_mutect2

@@ -61,7 +61,9 @@ e.g. `run.conf`
 
 6. start `_run_Facets`
 
-Note: 4, 5 and 6 could be run in parallel
+7. start `_run_Pindel`
+
+Note: steps 4 - 7  could be run in parallel
 
 
 ## Pipeline Modules
@@ -84,7 +86,9 @@ Note: 4, 5 and 6 could be run in parallel
 	- flagstat (samtools)
 
 3. Germline.sh (all samples together)
+	Part 1:
 	- HaplotypeCaller (gatk)
+	Part 2:
 	- CombineGVCFs (gatk)
 	- GenotypeGVCFs (gatk)
 	- VariantAnnotator (gatk)
@@ -107,3 +111,15 @@ Note: 4, 5 and 6 could be run in parallel
 	- snp_pileup (htstools)
 	- runFACETS.R (facets R package)
 
+6. Pindel (all samples together)
+	- pindel_setup.sh
+	- pindel 
+	- pindel2vcf
+	- vcf2tdt.py 
+	- pindel_filter.sh
+	- bedtools
+	- pindel_annotate.sh
+		annotate_variation.pl
+		annotation_COSMIC.py
+		annotation_KINASE.py
+		annotation_CANCER.py

@@ -347,7 +347,7 @@ function source_lg3_conf {
 
 function lg3_software_envvars {
     #echo "JAVA PYTHON RSCRIPT ANNOVAR_HOME BEDTOOLS BWA CUTADAPT GATK MUTECT PICARD_HOME SAMTOOLS PINDEL PINDEL2VCF TG"
-    echo "JAVA PYTHON ANNOVAR_HOME BEDTOOLS BWA CUTADAPT GATK MUTECT PICARD_HOME SAMTOOLS SAMTOOLS_OLD PINDEL PINDEL2VCF TG"
+    echo "JAVA PYTHON ANNOVAR_HOME BEDTOOLS BWA CUTADAPT GATK MUTECT SAMTOOLS SAMTOOLS_OLD PINDEL PINDEL2VCF"
 }
 
 function lg3_list_software {
@@ -378,12 +378,12 @@ function lg3_assert_software {
     assert_file_executable  --by-env=CUTADAPT
     assert_file_exists      --by-env=GATK
     #assert_file_exists      --by-env=MUTECT
-    assert_directory_exists --by-env=PICARD_HOME
+    #assert_directory_exists --by-env=PICARD_HOME
     assert_file_executable  --by-env=SAMTOOLS
     assert_file_executable  --by-env=SAMTOOLS_OLD
     assert_file_executable  --by-env=PINDEL
     assert_file_executable  --by-env=PINDEL2VCF
-    assert_file_executable  --by-env=TG
+    #assert_file_executable  --by-env=TG
 }
 
 function lg3_qsub_envvar_append_software {
