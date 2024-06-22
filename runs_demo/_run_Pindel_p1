@@ -67,7 +67,8 @@ PAT=${PATIENT/Patient/}
 
 if [ -z ${CHR} ]; then
 	# shellcheck disable=SC2086
-	for CH in {1..22} X Y 
+	#for CH in {1..22} X Y 
+	for CH in {11..22} X Y 
 	do 
 		CHR=chr${CH}
 		echo "Launching - CHR=${CHR:?}"

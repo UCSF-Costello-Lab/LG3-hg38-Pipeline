@@ -79,7 +79,7 @@ if $ALL ; then
     GL=true
 	 PINDEL=true
     MUT=true
-	 $AVF=true
+	 AVF=true
 	 FAC=true
 fi
 
@@ -170,7 +170,7 @@ if $GL ; then
     while IFS=$'\t' read -r ID _ _ SAMP
     do
         ### Expected output
-        OUT2=${WORKDIR}/${ID}.g.vcf
+        OUT2=${WORKDIR}/${ID}.g.vcf.idx
         if [ -s "${OUT2}" ]; then
 				RET=$(wcl ${OUT2})
             echo -e "Germline1 $ID $OK ${YEL}${RET}${NOC}"

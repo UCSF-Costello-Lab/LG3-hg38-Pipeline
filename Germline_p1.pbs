@@ -26,7 +26,7 @@ PROJECT=${PROJECT:-LG3}
 EMAIL=${EMAIL:?}
 LG3_SCRATCH_ROOT=${LG3_SCRATCH_ROOT:?}
 LG3_DEBUG=${LG3_DEBUG:-true}
-NODES=$(hostname)
+NODE=$(hostname)
 
 
 ### Debug
@@ -60,7 +60,7 @@ change_dir "${WDIR}"
 
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 echo "Started $PROG on $DATE"
-echo "Using node(s): $NODES"
+echo "Using node: $NODE"
 
 assert_file_exists "${LG3_OUTPUT_ROOT}/${PROJECT}/bwa-mem/${PATIENT}/${SAMPLE}.${RECAL_BAM_EXT}.bam"
 

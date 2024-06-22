@@ -3,14 +3,16 @@
 #PBS -N ${PATIENT}.pindel
 #PBS -e _Pindel_${PATIENT}.err
 #PBS -o _Pindel_${PATIENT}.out
-#PBS -l nodes=1:ppn=16,vmem=32gb
+#PBS -l nodes=1:ppn=32,vmem=64gb
 #PBS -l walltime=14-00:00:00
-#PBS -l mem=32gb
+#PBS -l mem=64gb
 #PBS -m ae
 
 # shellcheck source=scripts/utils.sh
 source "${LG3_HOME:?}/scripts/utils.sh"
 source_lg3_conf
+NODE=$(hostname)
+echo "node = ${NODE}"
 
 PROGRAM=${BASH_SOURCE[0]}
 echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] BEGIN: $PROGRAM"

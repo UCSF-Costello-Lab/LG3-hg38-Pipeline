@@ -84,7 +84,7 @@ grep -P "\\t${PATIENT}\\t" "${CONV}" | tr -d '\r' > "${PATIENT}.temp.conversions
 ## Get normal ID
 while IFS=$'\t' read -r ID _ _ SAMP
 do
-        if [ "$SAMP" = "Normal" ]; then
+        if [ "${SAMP:0:6}" = "Normal" ]; then
                 normid=${ID}
                 break
         fi
@@ -95,7 +95,7 @@ echo "- normid='${normid:?}'"
 ## Cycle through tumors and submit MUTECT jobs
 while IFS=$'\t' read -r ID _ _ SAMP
 do
-        if [ "$SAMP" = "Normal" ]; then
+        if [ "${SAMP:0:6}" = "Normal" ]; then
                 continue
         elif [ "${SAMP:0:2}" = "ML" ]; then
                 samp_label="ML"

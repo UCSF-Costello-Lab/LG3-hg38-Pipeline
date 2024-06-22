@@ -83,7 +83,7 @@ for SAMPLE in ${SAMPLES}; do
     echo "- FASTQ2: ${FASTQ2}"
     
     # shellcheck disable=SC2086
-    qsub ${QSUB_OPTS} -N tr$SAMPLE -v "${QSUB_ENVVARS},FASTQ1=${FASTQ1},FASTQ2=${FASTQ2},SAMPLE=${SAMPLE},QTY=${QTY},PROJECT=${PROJECT}" "$PBS"
+    qsub ${QSUB_OPTS} -N tr$SAMPLE -v "${QSUB_ENVVARS},FASTQ1=${FASTQ1},FASTQ2=${FASTQ2},SAMPLE=${SAMPLE},QTY=${QTY},PROJECT=${PROJECT},CONV=${CONV}" "$PBS"
 done
 
 echo "[$(date +'%Y-%m-%d %H:%M:%S %Z')] END: $PROGRAM"

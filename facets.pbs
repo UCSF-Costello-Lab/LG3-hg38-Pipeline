@@ -3,7 +3,7 @@
 #PBS -e _fac_${PATIENT}.err
 #PBS -o _fac_${PATIENT}.out
 #PBS -l nodes=1:ppn=12,vmem=32gb
-#PBS -l walltime=5-00:00:00
+#PBS -l walltime=2-00:00:00
 #PBS -l mem=32gb
 #PBS -m ae
 
