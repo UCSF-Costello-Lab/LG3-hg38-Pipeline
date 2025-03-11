@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]; then
+	echo "Usage: $0 patient[ID] patient[ID2] ..."
+	exit 1
+fi
+BWA=/costellolab/data4/LG3_hg38_output/LG4/bwa-mem
+for P in $@
+do
+	echo "PatientP${P}"
+	for HS in $(ls -1 ${BWA}/Patient${P}/??????_Hs_metrics.txt) 
+	do
+		echo "${HS}" |  cut -f8- -d/
+		grep BAIT_INTERVALS ${HS} | tr ' ' '\n' | head -n 4 | tail -n +4 | cut -f5- -d/
+	done
+done

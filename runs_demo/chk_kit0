@@ -1,0 +1,9 @@
+#!/bin/bash
+
+
+LG3CONF=/c4/home/jocostello/repos/LG3-hg38-Pipeline/lg3.conf
+
+source ${LG3CONF}
+
+#echo "ILIST := ${ILIST}" | grep ILIST
+echo "ILIST := ${ILIST}" 
