@@ -38,7 +38,8 @@ fi
 
 #module load gatk/4.3.0.0
 echo "GATK4 = ${GATK4}"
-module load openjdk/1.8.0
+#module load openjdk/1.8.0
+module load openjdk/17
 echo "Java : "
 java -version 2>&1
 

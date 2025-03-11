@@ -70,7 +70,9 @@ assert_file_exists "${FQ2}"
 echo "Software:"
 echo "- TG=${TG:?}"
 assert_file_executable "${TG}"
-echo "- CUTADAPT=${CUTADAPT:?}"
+#CUTADAPT=$(which cutadapt)
+CUTADAPT=~/.local/bin/cutadapt
+echo "- *** CUTADAPT=${CUTADAPT:?}"
 
 ### Default: --length 20 --quality 20 --stringency 1
 ### --fastqc

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 ####
 #This script parses a vcf file, compares a tumor-normal pair, and spits out stats

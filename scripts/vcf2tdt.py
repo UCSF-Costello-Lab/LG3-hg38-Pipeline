@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 import sys, subprocess, re
 
 def vcf2tdt(filename):

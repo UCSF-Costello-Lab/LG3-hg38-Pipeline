@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 import sys, subprocess, os.path
 
 def pindel_annotate_normal_coverage(filename, projectname):

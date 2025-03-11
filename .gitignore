@@ -6,3 +6,4 @@
 *.bk
 logs
 runs_demo/patient_ID_conversions.*
+run.conf.*

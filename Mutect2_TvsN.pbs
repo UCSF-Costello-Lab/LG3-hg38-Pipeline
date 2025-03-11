@@ -8,7 +8,7 @@
 #PBS -o _M2_${TUMOR}.out
 #PBS -N M2
 #PBS -l nodes=1:ppn=1,vmem=256g
-#PBS -l walltime=4-00:00:00
+#PBS -l walltime=14-00:00:00
 #PBS -l mem=256gb
 #PBS -m ae
 
@@ -103,8 +103,8 @@ echo "SCRATCH=${SCRATCH}"
   "${XMX}" \
   "${WORKDIR}"; } 2>&1 || error "Mutect2 failed"
 
-echo "Adding header to "NOR-${NORMAL}__${TYPE}-${TUMOR}.tsv""
-${LG3_HOME}/scripts/add_fun_head.sh "NOR-${NORMAL}__${TYPE}-${TUMOR}.tsv"
+#echo "Adding header to "NOR-${NORMAL}__${TYPE}-${TUMOR}.tsv""
+#${LG3_HOME}/scripts/add_fun_head.sh "NOR-${NORMAL}__${TYPE}-${TUMOR}.tsv"
 
 make_dir "${WORKDIR}"
 echo "Copy results from ${SCRATCH} to ${WORKDIR}"

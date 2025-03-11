@@ -54,10 +54,13 @@ echo "- fastq1=${fastq1:?}"
 echo "- fastq2=${fastq2:?}"
 echo "- SAMPLE=${S:?}"
 
-echo "GATK4 = ${GATK4}"
-module load openjdk/1.8.0
+#module load openjdk/1.8.0
+module load CBI
+module load openjdk/17
+module load gatk/4.5.0.0       2> /dev/null && GATK4=$(which gatk)
 echo "Java : "
 java -version 2>&1
+echo "GATK4 = ${GATK4}"
 
 DUP_METRIX_SUMMARY=${LG3_HOME}/scripts/dup_metrix_summary.sh
 assert_file_exists ${DUP_METRIX_SUMMARY}
@@ -159,9 +162,9 @@ if ${CLEAN}; then
    rm -f "${S}_m.bam"
 fi
 
-${SAMTOOLS} flagstat "${S}"_md.bam > "${S}"_md.bam.flagstat
-echo "Flagstat after MarkDuplicates"
-cat "${S}"_md.bam.flagstat
+#${SAMTOOLS} flagstat "${S}"_md.bam > "${S}"_md.bam.flagstat
+#echo "Flagstat after MarkDuplicates"
+#cat "${S}"_md.bam.flagstat
 
 echo "****** MarkDuplicates Completed! ******"
 

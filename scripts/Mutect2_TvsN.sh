@@ -13,9 +13,9 @@ echo "Call: ${BASH_SOURCE[*]}"
 echo "Script: $PROGRAM"
 echo "Arguments: $*"
 
-#module load gatk/4.3.0.0
+#module load gatk/4.5.0.0
 echo "GATK4 = ${GATK4}"
-module load openjdk/1.8.0
+module load openjdk/17
 echo "Java : "
 java -version 2>&1
 
@@ -42,8 +42,6 @@ if $LG3_DEBUG ; then
   echo "- hostname=$(hostname)"
   echo "- ncores=${ncores}"
 fi
-
-#module load openjdk/1.8.0
 
 ### Input
 nbamfile=$1
@@ -77,7 +75,7 @@ assert_file_executable "${GATK4:?}"
 #assert_file_executable "${LG3_HOME}"/${GATK4}4-funcotator-vcf2tsv
 
 echo "Software:"
-python --version
+python2 --version
 java -version
 echo "GATK4 = ${GATK4}"
 
@@ -119,7 +117,8 @@ INT=${ILIST}
 echo "Intervals : ${INT}"
 
 echo -e "\\n\\n****** Somatic variations using MuTect2! ******"
-
+##DEF --min-base-quality-score 10 \ #
+##DEF --min-pruning 2
 { time ${GATK4} --java-options "-Xms64G -Xmx64G" Mutect2 \
       --verbosity ${VERBOSITY} \
 		--tmp-dir "${TMP_DIR}" \
@@ -131,6 +130,12 @@ echo -e "\\n\\n****** Somatic variations using MuTect2! ******"
       -normal "${normalname}" \
       -germline-resource "${GNOMAD}" \
       --f1r2-tar-gz f1r2.tar.gz \
+		--min-base-quality-score 10 \
+		--linked-de-bruijn-graph false \
+		--recover-all-dangling-branches false \
+		--min-pruning 2 \
+		--disable-adaptive-pruning false \
+		--debug-assembly false \
       -O "${prefix}".unfiltered.vcf; } 2>&1 || error "MuTect2 FAILED"
 assert_file_exists "${prefix}".unfiltered.vcf
 assert_file_exists f1r2.tar.gz
@@ -189,6 +194,9 @@ cat "${prefix}".contamination.table
 echo "****** CalculateContamination Completed! ******"
 
 echo -e "\\n\\n****** Pass learned read orientation model to FilterMutectCallswith ******"
+##DEF: --f-score-beta 1.0 \
+###  --threshold-strategy FALSE_DISCOVERY_RATE
+### --false-discovery-rate 0.05
 { time ${GATK4} FilterMutectCalls \
       --verbosity ${VERBOSITY} \
 		--tmp-dir "${TMP_DIR}" \
@@ -196,6 +204,9 @@ echo -e "\\n\\n****** Pass learned read orientation model to FilterMutectCallswi
       -L "${INT}" \
 		-ip "${PADDING}" \
       -V "${prefix}".unfiltered.vcf \
+		--threshold-strategy OPTIMAL_F_SCORE \
+		--f-score-beta 1.0 \
+		--filtering-stats "${prefix}".filtering.stats \
       --tumor-segmentation "${prefix}".segments.table \
       --contamination-table "${prefix}".contamination.table \
       --ob-priors read-orientation-model.tar.gz \
@@ -251,9 +262,9 @@ if ${CLEAN}; then
    rm -f read-orientation-model.tar.gz
    rm -f "${prefix}".normal_pileup.table
    rm -f "${prefix}".tumor_pileup.table
-   rm -f "${prefix}".unfiltered.vcf
-   rm -f "${prefix}".unfiltered.vcf.idx
-   rm -f "${prefix}".unfiltered.vcf.stats
+   #rm -f "${prefix}".unfiltered.vcf
+   #rm -f "${prefix}".unfiltered.vcf.idx
+   #rm -f "${prefix}".unfiltered.vcf.stats
    rm -f "${prefix}".segments.table
    echo "****** Cleaning Complete! *******"
 fi

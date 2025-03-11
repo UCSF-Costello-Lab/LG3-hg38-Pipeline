@@ -1,3 +1,5 @@
+#!/usr/bin/python2
+
 import sys, subprocess, os.path, os
 
 def pindel_setup(patient_ID, projectname, patIDs):

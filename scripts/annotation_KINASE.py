@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 ####
 #This script annotates a filtered mutect output with kinase information

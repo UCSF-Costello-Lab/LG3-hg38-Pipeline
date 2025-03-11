@@ -53,8 +53,9 @@ assert_patient_name "${PATIENT}"
 assert_file_exists "${CONV}"
 CONV=$(readlink -e "${CONV}") ## Absolute path
 
-module load CBI r/3.6.0
-python --version
+#module load CBI r/3.6.0
+module load r/4.2.3
+python2 --version
 ${RSCRIPT} --version
 
 SNP_PILEUP_SETUP=${LG3_HOME}/scripts/create_input_snp_pileup.py
@@ -82,12 +83,12 @@ grep -w "${PATIENT}" "${CONV}" >> "${CONV}.${PATIENT}"
 wc -l "${CONV}.${PATIENT}"
 
 echo -e "\\n========= Create config file for ${SNP_PILEUP_SETUP}"
-python "${SNP_PILEUP_SETUP}" "${CONV}.${PATIENT}" "${BAMPATH}" || error "${SNP_PILEUP_SETUP} failed"
+python2 "${SNP_PILEUP_SETUP}" "${CONV}.${PATIENT}" "${BAMPATH}" || error "${SNP_PILEUP_SETUP} failed"
 rm "${CONV}.${PATIENT}"
 
 CNF=${PATIENT}.snp_pileup_input.txt
 grep -w "${PATIENT}" snp_pileup_input.txt > "${CNF}"
-snp_pileup_input.txt
+#snp_pileup_input.txt
 assert_file_exists "${CNF}"
 echo "========= Final config file:"
 cat "${CNF}"

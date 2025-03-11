@@ -263,7 +263,7 @@ function assert_python {
     if [[ -n "$bin" ]]; then
         assert_file_executable "$1"
     else
-        bin=$(command -v python) || error "Python executable not found on PATH: ${PATH}"
+        bin=$(command -v python2) || error "Python executable not found on PATH: ${PATH}"
     fi
     
     ## Assert correct version
@@ -347,7 +347,7 @@ function source_lg3_conf {
 
 function lg3_software_envvars {
     #echo "JAVA PYTHON RSCRIPT ANNOVAR_HOME BEDTOOLS BWA CUTADAPT GATK MUTECT PICARD_HOME SAMTOOLS PINDEL PINDEL2VCF TG"
-    echo "JAVA PYTHON ANNOVAR_HOME BEDTOOLS BWA CUTADAPT GATK MUTECT SAMTOOLS SAMTOOLS_OLD PINDEL PINDEL2VCF"
+    echo "JAVA PYTHON ANNOVAR_HOME BEDTOOLS BWA GATK MUTECT SAMTOOLS SAMTOOLS_OLD PINDEL PINDEL2VCF"
 }
 
 function lg3_list_software {
@@ -375,7 +375,7 @@ function lg3_assert_software {
     assert_directory_exists --by-env=ANNOVAR_HOME
     assert_file_executable  --by-env=BEDTOOLS
     assert_file_executable  --by-env=BWA
-    assert_file_executable  --by-env=CUTADAPT
+    #assert_file_executable  --by-env=CUTADAPT
     assert_file_exists      --by-env=GATK
     #assert_file_exists      --by-env=MUTECT
     #assert_directory_exists --by-env=PICARD_HOME
